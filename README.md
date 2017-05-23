@@ -38,13 +38,13 @@ Creating an executable build generates an executable jar package called "ari-${r
 `java -jar ari-${version}.jar [{-r,--receiver-port} 14265] [{-p,--peer-discovery}] [{-w,--remote-wallet}] [{-l,--local} ipv4/ipv6][{-c,--enabled-cors} *] [{-d,--debug}] [{-e,--experimental}]`
 				
 				
-The following argument is mandatory to start a Node:
+The following argument is mandatory to start a Node:  
 `-r or --receiver-port define the Mesh port`
 
-Also you have to either select
-`-p or --peer-discovery enables the API for remote access (will only enable commands that are necessary for peer discovery)`
-OR
-`-w or --remote-wallet enable the node for remote access and limit the API to commands that are needed for enabling light wallet access (including peer discovery)`
+Also you have to either select  
+`-p or --peer-discovery enables the API for remote access (will only enable commands that are necessary for peer discovery)`  
+OR  
+`-w or --remote-wallet enable the node for remote access and limit the API to commands that are needed for enabling light wallet access (including peer discovery)`  
 to enable and get access to peer discovery.
 
 The API runs on port 14266 by default.
