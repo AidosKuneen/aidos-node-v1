@@ -2,12 +2,12 @@
 [![GitHub license](https://img.shields.io/badge/license-GPLv3-blue.svg)](https://raw.githubusercontent.com/AidosKuneen/aidos-node/master/LICENSE)
 
 
-##Introduction
+## Introduction
 
 ARI is the Aidos Reference Implementation. It's the implementation of a full Node with a JSON-REST HTTP interface (API).
 It's based upon Java 8 and therefore a requirement.
 
-##How To Use
+## How To Use
 
 Maven is needed in order to compile and build the ARI.
 
@@ -39,7 +39,7 @@ The API runs on port 14266 by default.
 
 The following parameters are optional:
 
-`-l or --local ipv4/ipv6 ,to select which ip address the node should be reachable on. Without this argument the ip address is selected automatically. This parameter is mostly helpful if you have multiple interfaces or if you want to run a node on DS-Lite to specify your ipv6`
+`-l or --local ipv4/ipv6 , to select which ip address the node should be reachable on. Without this argument the ip address is selected automatically. This parameter is mostly helpful if you have multiple interfaces or if you want to run a node on DS-Lite to specify your ipv6`
 
 `-c or --enabled-cors enable the API cross origin filter: cors domain defined between ''`
 
@@ -53,6 +53,6 @@ For instance a valid call would be:
 
 `java -jar target/ari-1.0.0.jar -r 14265 -p`
 
-##LICENSE
+## LICENSE
 [GNU General Public License v3.0](https://github.com/AidosKuneen/aidos-node/master/LICENSE)
 
