@@ -347,7 +347,9 @@ public class PD {
 										if (peer.getType() == ipType.ipv4 && getIpMode() == ipType.mixed) {
 											tempLocal = new InetSocketAddress(ipMode.get(ipType.ipv4), defaultMeshPort);
 										}
-										if (pushPeer(peer.getAddress(), tempLocal) >= 0) {
+										if (pushPeer(
+												new InetSocketAddress(peer.getAddress().getAddress(), defaultAPIport),
+												tempLocal) >= 0) {
 											Node.instance().addPeer(new Peers(peer.getAddress(), peer.getType()));
 											log.debug("Adding peer after disconnect {}",
 													peer.getAddress().getAddress().getHostAddress());
