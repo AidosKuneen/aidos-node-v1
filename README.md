@@ -7,7 +7,19 @@
 ARI is the Aidos Reference Implementation. It's the implementation of a full Node with a JSON-REST HTTP interface (API).
 It's based upon Java 8 and therefore a requirement.
 
-## How To Use
+## Install
+
+1. You can either download a build version from the [Release Page](https://github.com/AidosKuneen/aidos-node/releases) or build by yourself by following the instructions hereafter.
+
+2. Get [Maven](http://maven.apache.org/download.cgi)
+
+3. Clone this repository:
+
+  ```
+  git clone https://github.com/AidosKuneen/aidos-node
+  ```
+
+## How To Build
 
 Maven is needed in order to compile and build the ARI.
 
@@ -54,5 +66,4 @@ For instance a valid call would be:
 `java -jar target/ari-1.0.0.jar -r 14265 -p`
 
 ## LICENSE
-[GNU General Public License v3.0](https://github.com/AidosKuneen/aidos-node/master/LICENSE)
-
+[GNU General Public License v3.0](https://github.com/AidosKuneen/aidos-node/blob/master/LICENSE)
