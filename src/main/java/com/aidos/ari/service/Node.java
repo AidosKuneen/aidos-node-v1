@@ -272,8 +272,12 @@ public class Node {
 				.remove(new Peers(new InetSocketAddress(uri.getHost(), uri.getPort()), PD.getIpTypeForAddress(uri)));
 	}
 
-	public boolean removePeer(InetSocketAddress is) {
+	public boolean removePeer(final InetSocketAddress is) {
 		return peers.remove(new Peers(is, PD.getIpTypeForAddress(is.getAddress())));
+	}
+	
+	public boolean removePeer(final Peers peer) {
+		return Node.instance().getPeers().remove(peer);
 	}
 
 	public boolean addPeer(final URI uri) {

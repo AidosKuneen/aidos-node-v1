@@ -316,10 +316,25 @@ public class PD {
 							// Can start with initial list.
 							statusExecutor.execute(() -> {
 								if (!isPeerOnline(peer.getAddress())) {
-									peers.remove(new Peers(peer.getAddress(), peer.getType()));
+									Node.instance().removePeer(peer);
 								} else {
-									// Put all online peers to list so can iterate over them
-									// re-test offline also.
+									// Check all online peers push status, also needed for bootstrap from peerlist.store
+									// because otherwise added peers are never pushed to
+									InetSocketAddress tempLocal = local;
+									if (peer.getType() == ipType.ipv4 && getIpMode() == ipType.mixed) {
+										tempLocal = new InetSocketAddress(ipMode.get(ipType.ipv4), defaultMeshPort);
+									}
+									int pushStatus = pushPeer(
+											new InetSocketAddress(peer.getAddress().getAddress(), defaultAPIport),
+											tempLocal);
+									if (pushStatus >= 0) {
+										log.debug("Push peer: {} Status: {}",
+												peer.getAddress().getAddress().getHostAddress(), pushStatus);
+									} else {
+										// Couldn't push to, so can remove
+										Node.instance().removePeer(peer);
+									}
+									// Add to search this peers peers anyway
 									peersIterate.add(peer);
 									// No double-entries because DC is not cleared
 									if (!peersIterateDC.contains(peer.getAddress())) {
@@ -386,20 +401,6 @@ public class PD {
 								Map<InetSocketAddress, ipType> searchList = getPeersAndType(startSearchAPI);
 								// Mark this peers peers as searched.
 								peerSearch.put(startSearch.getAddress(), true);
-								// If remote peer doesn't have local peer added yet - should only happen for DNS.
-								InetSocketAddress tempLocal = local;
-								if (getIpMode() == ipType.mixed
-										&& getIpTypeForAddress(startSearch.getAddress().getAddress()) == ipType.ipv4) {
-									// update local
-									tempLocal = new InetSocketAddress(ipMode.get(ipType.ipv4), defaultMeshPort);
-								}
-								if (!searchList.containsKey(tempLocal)) {
-									log.debug("Push to DNS: {}", startSearch.getAddress());
-									// Try to add local peer to remote, if can't remove from local peers.
-									if (pushPeer(startSearchAPI, tempLocal) == -1) {
-										peers.remove(new Peers(startSearch.getAddress(), startSearch.getType()));
-									}
-								}
 								// Try to add these.
 								for (InetSocketAddress a : searchList.keySet()) {
 									// Contains means this peer has been added (was tried to be added) already.
@@ -460,10 +461,8 @@ public class PD {
 
 	// Simple connection check with timeout (faster than API check)
 	public static boolean isPeerOnline(InetSocketAddress address) {
-		try {
-			try (Socket soc = new Socket()) {
-				soc.connect(address, CONNECTION_TIMEOUT);
-			}
+		try (Socket soc = new Socket()) {
+			soc.connect(address, CONNECTION_TIMEOUT);
 		} catch (IOException ex) {
 			log.debug("Peer {} not reachable.", address.getAddress().getHostAddress());
 			return false;
