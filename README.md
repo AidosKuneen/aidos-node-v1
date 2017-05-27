@@ -42,12 +42,13 @@ Creating an executable build generates an executable jar package called "ari-${r
 `-r` or `--receiver-port` define the Mesh port
 
 * Also you have to either select  
-`-p` or `--peer-discovery` enables the API for remote access (will only enable commands that are necessary for peer discovery)`
+** `-p` or `--peer-discovery` enables the API for remote access (will only enable commands that are necessary for peer discovery)
+
 OR  
-`-w` or `--remote-wallet` enable the node for remote access and limit the API to commands that are needed for enabling light wallet access (including peer discovery)`
+
+** `-w` or `--remote-wallet` enable the node for remote access and limit the API to commands that are needed for enabling light wallet access (including peer discovery)`
 to enable and get access to peer discovery.
 
-The API runs on port 14266 by default.
 
 The following parameters are optional:
 
@@ -61,9 +62,12 @@ The following parameters are optional:
 
 * `-h` prints the usage
  
+
 For instance a valid call would be:
 
 `java -jar target/ari-1.0.0.jar -r 14265 -p`
+
+Note that the API runs on port 14266 by default.
 
 ## LICENSE
 [GNU General Public License v3.0](https://github.com/AidosKuneen/aidos-node/blob/master/LICENSE)
