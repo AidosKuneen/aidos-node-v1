@@ -60,7 +60,7 @@ The following parameters are optional:
 
 * `-d` or `--debug` prints on the standard output, more debug informations
 
-* `-e` or `--experimental activates experimental features.
+* `-e` or `--experimental` activates experimental features.
 
 * `-h` prints the usage
  
