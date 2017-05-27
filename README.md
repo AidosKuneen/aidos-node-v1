@@ -35,8 +35,7 @@ Creating an executable build generates an executable jar package called "ari-${r
 
 ## How To Execute
 
-`java -jar ari-${version}.jar [{-r,--receiver-port} 14265] [{-p,--peer-discovery}] [{-w,--remote-wallet}] [{-l,--local} ipv4/ipv6][{-c,--enabled-cors} *] [{-d,--debug}] [{-e,--experimental}]`
-				
+```java -jar ari-${version}.jar [{-r,--receiver-port} 14265] [{-p,--peer-discovery}] [{-w,--remote-wallet}] [{-l,--local} ipv4/ipv6][{-c,--enabled-cors} *] [{-d,--debug}] [{-e,--experimental}]```
 				
 * The following argument is mandatory to start a Node:  
 `-r` or `--receiver-port` define the Mesh port
@@ -65,7 +64,7 @@ The following parameters are optional:
 
 For instance a valid call would be:
 
-`java -jar target/ari-1.0.0.jar -r 14265 -p`
+```java -jar target/ari-1.0.0.jar -r 14265 -p```
 
 Note that the API runs on port 14266 by default.
 
