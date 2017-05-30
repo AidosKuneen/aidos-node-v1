@@ -54,10 +54,10 @@ public class PD {
 
 	private static final String PD_FILE = "peerlist.store";
 
-	private static final int CONNECTION_TIMEOUT = 1000; // in ms
+	private static final int CONNECTION_TIMEOUT = 2000; // in ms
 
 	// Number of nodes that should be added as peers
-	private static final int PEERS_TO_FIND = 8;
+	private static final int PEERS_TO_FIND = 6;
 
 	// Empty string for "false", or local ip in ipv4/6
 	private static Map<ipType, String> ipMode = new HashMap<ipType, String>();
@@ -315,7 +315,8 @@ public class PD {
 						for (final Peers peer : peers) {
 							// Can start with initial list.
 							statusExecutor.execute(() -> {
-								if (!isPeerOnline(peer.getAddress())) {
+								if (!isPeerOnline(
+										new InetSocketAddress(peer.getAddress().getAddress(), defaultAPIport))) {
 									Node.instance().removePeer(peer);
 								} else {
 									// Check all online peers push status, also needed for bootstrap from peerlist.store
@@ -356,7 +357,8 @@ public class PD {
 							for (final Peers peer : peersIterateDC) {
 								statusExecutor.execute(() -> {
 									InetSocketAddress tempLocal = local;
-									if (isPeerOnline(peer.getAddress())) {
+									if (isPeerOnline(
+											new InetSocketAddress(peer.getAddress().getAddress(), defaultAPIport))) {
 										// Have to push also because other nodes also lost connection.
 										// Determine ipType to push right local in case of mixed ipMode
 										if (peer.getType() == ipType.ipv4 && getIpMode() == ipType.mixed) {
