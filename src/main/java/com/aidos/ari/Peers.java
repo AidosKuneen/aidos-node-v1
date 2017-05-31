@@ -6,6 +6,8 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -17,6 +19,7 @@ public class Peers {
 	private int numberOfAllTransactions;
 	private int numberOfNewTransactions;
 	private int numberOfInvalidTransactions;
+	private ExecutorService exec = Executors.newFixedThreadPool(10);
 
 //	public Peers(final InetSocketAddress address) {
 //		this.address = address;
@@ -38,21 +41,23 @@ public class Peers {
 	}
 
 	public void send(final byte[] packet) {
-		DataOutputStream dos = null;
-		try (Socket s = new Socket();) {
-			s.connect(address, 2000);
-			dos = new DataOutputStream(s.getOutputStream());
-			dos.write(packet);
-		} catch (final IOException e) {
-			log.error("cannot send to {},{}", address, e.getMessage());
-		} finally {
-			try {
-				if (dos != null) {
-					dos.close();
+		exec.submit(() -> {
+			DataOutputStream dos = null;
+			try (Socket s = new Socket();) {
+				s.connect(address, 2000);
+				dos = new DataOutputStream(s.getOutputStream());
+				dos.write(packet);
+			} catch (final IOException e) {
+				log.error("cannot send to {},{}", address, e.getMessage());
+			} finally {
+				try {
+					if (dos != null) {
+						dos.close();
+					}
+				} catch (final IOException ee) {
 				}
-			} catch (final IOException ee) {
 			}
-		}
+		});
 	}
 
 	@Override
