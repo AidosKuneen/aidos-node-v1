@@ -109,6 +109,7 @@ public class Node {
 
 			while (!shuttingDown.get()) {
 				try (Socket s = socket.accept(); DataInputStream in = new DataInputStream(s.getInputStream());) {
+					s.setSoTimeout(2000);
 					int psize = 0;
 					for (psize = 0; psize < TRANSACTION_PACKET_SIZE;) {
 						int si = in.read(receivingPacket, psize, TRANSACTION_PACKET_SIZE - psize);
