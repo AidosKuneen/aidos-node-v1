@@ -48,9 +48,9 @@ The following argument is mandatory to start a Node:
 
 Also you have to either select  
 * `-p` or `--peer-discovery` enables the API for remote access (will only enable commands that are necessary for peer discovery)
-* `-w` or `--remote-wallet` enable the node for remote access and limit the API to commands that are needed for enabling light wallet access (including peer discovery)`
-to enable and get access to peer discovery.
+* `-w` or `--remote-wallet` enable the node for remote access and limit the API to commands that are needed for enabling light wallet access (including peer discovery)  
 
+to enable and get access to peer discovery.
 
 The following parameters are optional:
 
