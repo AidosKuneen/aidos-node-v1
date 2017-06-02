@@ -60,8 +60,8 @@ public class PD {
 	// Empty string for "false", or local ip in ipv4/6
 	private static Map<ipType, String> ipMode = new HashMap<ipType, String>();
 	// Seed for test has to be dualstack!
-	private static String ipSeed = "seed1.aidoskuneen.com";
-	private static String SRVEntry = "_seeds._tcp.aidoskuneen.com";
+	private static String ipSeed = "testnetseed1.aidoskuneen.com";
+	private static String SRVEntry = "_testnetseeds._tcp.aidoskuneen.com";
 
 	private static boolean connect;
 	private static boolean startLocal;
