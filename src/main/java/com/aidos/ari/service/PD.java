@@ -54,8 +54,6 @@ public class PD {
 
 	private static final String PD_FILE = "peerlist.store";
 
-	private static final int CONNECTION_TIMEOUT = 2000; // in ms
-
 	// Number of nodes that should be added as peers
 	private static final int PEERS_TO_FIND = 6;
 
@@ -195,8 +193,8 @@ public class PD {
 					// ipv4.
 					Collections.shuffle(Arrays.asList(address));
 					for (InetAddress a : address) {
-						if (a instanceof Inet4Address && PD.instance.getIpMode() != ipType.ipv6
-								&& PD.instance.getIpMode() != ipType.mixed) {
+						if (a instanceof Inet4Address && PD.instance().getIpMode() != ipType.ipv6
+								&& PD.instance().getIpMode() != ipType.mixed) {
 							result = new InetSocketAddress((Inet4Address) a, srv.getPort());
 							api = new InetSocketAddress((Inet4Address) a, defaultAPIport);
 							if (isPeerOnline(api)) {
@@ -326,7 +324,8 @@ public class PD {
 										tempLocal = new InetSocketAddress(ipMode.get(ipType.ipv4), defaultMeshPort);
 									}
 									int pushStatus = pushPeer(
-											new InetSocketAddress(peer.getAddress().getAddress(), defaultAPIport),
+											new InetSocketAddress(peer.getAddress().getAddress().getHostAddress(),
+													defaultAPIport),
 											tempLocal);
 									if (pushStatus >= 0) {
 										log.debug("Push peer: {} Status: {}",
@@ -338,7 +337,7 @@ public class PD {
 									// Add to search this peers peers anyway
 									peersIterate.add(peer);
 									// No double-entries because DC is not cleared
-									if (!peersIterateDC.contains(peer.getAddress())) {
+									if (!peersIterateDC.contains(peer)) {
 										peersIterateDC.add(peer);
 									}
 								}
@@ -346,8 +345,8 @@ public class PD {
 						}
 						statusExecutor.shutdown();
 						// Give 1 sec buffer
-						if (!statusExecutor.awaitTermination(PD.instance().getTimeoutValue() + 1, TimeUnit.SECONDS)) {
-							log.warn("Threads didn't finish in {} msec.", PD.instance().getTimeoutValue() + 1);
+						if (!statusExecutor.awaitTermination(Configuration.CONNECTION_TIMEOUT + 1, TimeUnit.SECONDS)) {
+							log.warn("Threads didn't finish in {} msec.", Configuration.CONNECTION_TIMEOUT + 1);
 						}
 					} else {
 						// After node completely disconnected from net it loses all its peers.
@@ -365,7 +364,8 @@ public class PD {
 											tempLocal = new InetSocketAddress(ipMode.get(ipType.ipv4), defaultMeshPort);
 										}
 										if (pushPeer(
-												new InetSocketAddress(peer.getAddress().getAddress(), defaultAPIport),
+												new InetSocketAddress(peer.getAddress().getAddress().getHostAddress(),
+														defaultAPIport),
 												tempLocal) >= 0) {
 											Node.instance().addPeer(new Peers(peer.getAddress(), peer.getType()));
 											log.debug("Adding peer after disconnect {}",
@@ -376,9 +376,9 @@ public class PD {
 							}
 							statusExecutor.shutdown();
 							// Give 1 sec buffer
-							if (!statusExecutor.awaitTermination(PD.instance().getTimeoutValue() + 1,
+							if (!statusExecutor.awaitTermination(Configuration.CONNECTION_TIMEOUT + 1,
 									TimeUnit.SECONDS)) {
-								log.warn("Threads didn't finish in {} msec.", PD.instance().getTimeoutValue() + 1);
+								log.warn("Threads didn't finish in {} msec.", Configuration.CONNECTION_TIMEOUT + 1);
 							}
 						}
 					}
@@ -451,7 +451,7 @@ public class PD {
 							}
 						}
 					}
-					Thread.sleep(1000 * 60 * 5); // Every 5 mins
+					Thread.sleep(1000 * 60 * 6); // Every 6 mins
 				} catch (final Exception e) {
 					log.error("PD Thread Exception: ", e);
 				}
@@ -464,7 +464,7 @@ public class PD {
 	// Simple connection check with timeout (faster than API check)
 	public static boolean isPeerOnline(InetSocketAddress address) {
 		try (Socket soc = new Socket()) {
-			soc.connect(address, CONNECTION_TIMEOUT);
+			soc.connect(address, Configuration.CONNECTION_TIMEOUT);
 		} catch (IOException ex) {
 			log.debug("Peer {} not reachable.", address.getAddress().getHostAddress());
 			return false;
@@ -607,10 +607,6 @@ public class PD {
 		}
 	}
 
-	public int getTimeoutValue() {
-		return CONNECTION_TIMEOUT;
-	}
-
 	public ipType getIpMode() {
 		if (ipMode.get(ipType.ipv4) != "" && ipMode.get(ipType.ipv6) != "") {
 			return ipType.mixed;
@@ -619,6 +615,17 @@ public class PD {
 		} else {
 			return ipType.ipv6;
 		}
+	}
+
+	// tests if the pushed ip is the right claimed type and also if its compatible with the node type.
+	public static boolean pushTest(ipType given, ipType claimed) {
+		if (compatibleIpTypes(given, claimed)) {
+			if (PD.instance().getIpMode() == ipType.mixed && given == ipType.ipv4 && claimed == ipType.mixed) {
+				return false;
+			}
+			return true;
+		}
+		return false;
 	}
 
 	public static ipType getIpTypeForAddress(InetAddress address) {
@@ -654,7 +661,7 @@ public class PD {
 	// ipv4 searches ipv4 only
 	// ipv6 searches ipv6 only
 	// mixed searches both
-	private boolean compatibleIpTypes(ipType ipMode, ipType remote) {
+	private static boolean compatibleIpTypes(ipType ipMode, ipType remote) {
 		if ((ipMode == ipType.ipv4 && remote == ipType.ipv6) || (ipMode == ipType.ipv6 && remote == ipType.ipv4)) {
 			return false;
 		}

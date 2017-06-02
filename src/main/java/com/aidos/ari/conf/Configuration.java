@@ -16,6 +16,8 @@ public class Configuration {
 		REMOTEAPI, REMOTEWALLET, DEBUG, EXPERIMENTAL // experimental features.
 	}
 
+	public static final int CONNECTION_TIMEOUT = 2000; // in ms
+	
 	static {
 		// defaults
 		conf.put(DefaultConfSettings.API_PORT.name(), "14266");

@@ -17,6 +17,8 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
@@ -73,6 +75,14 @@ public class API {
 
 	// Max amount of peers that a node will accept.
 	private static final int MAX_PEERS = 14;
+
+	private final static int HASH_SIZE = 81;
+	private final static int TRYTES_SIZE = 2673;
+
+	private final static char ZERO_LENGTH_ALLOWED = 'Y';
+	private final static char ZERO_LENGTH_NOT_ALLOWED = 'N';
+
+	private Pattern trytesPattern = Pattern.compile("[9A-Z]*");
 
 	private Undertow server;
 
@@ -146,6 +156,9 @@ public class API {
 				return RetrieveIpResponse.create(sourceAddress.getAddress().getHostAddress());
 			}
 			case "addPeer": {
+				if (!request.containsKey("uri") && !request.containsKey("type")) {
+					return ErrorResponse.create("Invalid parameters.");
+				}
 				final String uri = (String) request.get("uri");
 				final ipType type = ipType.valueOf((String) request.get("type"));
 				// returns true if valid request, means uri has same ip than sourceAddress
@@ -153,7 +166,8 @@ public class API {
 				// also only add if remote API is reachable
 				if (checkInvokerAddress(uri, sourceAddress) && !addressIsLoopBack
 						&& PD.isPeerOnline(new InetSocketAddress(sourceAddress.getAddress().getHostAddress(),
-								Configuration.integer(DefaultConfSettings.API_PORT)))) {
+								Configuration.integer(DefaultConfSettings.API_PORT)))
+						&& PD.pushTest(PD.getIpTypeForAddress(sourceAddress.getAddress()), type)) {
 					log.debug("Invoking 'addPeer' with {} from address {} (type {})", uri,
 							sourceAddress.getAddress().getHostAddress(), type.name());
 					// can refuse if maxPeers is reached
@@ -161,7 +175,7 @@ public class API {
 					return addPeerStatement(uri, type);
 				} else {
 					// creates HTTP-Error 400 when called
-					return ErrorResponse.create("You can only add your own node to peers (also no loopback).");
+					return ErrorResponse.create("Failure adding peer.");
 				}
 			}
 			case "getPeerAddresses": {
@@ -171,32 +185,76 @@ public class API {
 				return getPeerAddressStatement();
 			}
 			case "attachToMesh": {
+				if (!request.containsKey("trunkTransaction") || !request.containsKey("branchTransaction")
+						|| !request.containsKey("minWeightMagnitude") || !request.containsKey("trytes")) {
+					return ErrorResponse.create("Invalid parameters.");
+				}
+				if (!validTrytes((String) request.get("trunkTransaction"), HASH_SIZE, ZERO_LENGTH_NOT_ALLOWED)) {
+					return ErrorResponse.create("Invalid trunkTransaction hash.");
+				}
+				if (!validTrytes((String) request.get("branchTransaction"), HASH_SIZE, ZERO_LENGTH_NOT_ALLOWED)) {
+					return ErrorResponse.create("Invalid branchTransaction hash.");
+				}
 				final Hash trunkTransaction = new Hash((String) request.get("trunkTransaction"));
 				final Hash branchTransaction = new Hash((String) request.get("branchTransaction"));
 				final int minWeightMagnitude = ((Double) request.get("minWeightMagnitude")).intValue();
 				final List<String> trytes = (List<String>) request.get("trytes");
-
+				for (final String tryt : trytes) {
+					if (!validTrytes(tryt, TRYTES_SIZE, ZERO_LENGTH_NOT_ALLOWED)) {
+						return ErrorResponse.create("Invalid trytes input.");
+					}
+				}
 				return attachToMeshStatement(trunkTransaction, branchTransaction, minWeightMagnitude, trytes);
 			}
 			case "broadcastTransactions": {
+				if (!request.containsKey("trytes")) {
+					return ErrorResponse.create("Invalid parameters.");
+				}
 				final List<String> trytes = (List<String>) request.get("trytes");
+				for (final String tryt : trytes) {
+					if (!validTrytes(tryt, TRYTES_SIZE, ZERO_LENGTH_NOT_ALLOWED)) {
+						return ErrorResponse.create("Invalid trytes input.");
+					}
+				}
 				log.debug("Invoking 'broadcastTransactions' with {}", trytes);
 				return broadcastTransactionStatement(trytes);
 			}
 			case "findTransactions": {
+				if (!request.containsKey("bundles") && !request.containsKey("addresses") && !request.containsKey("tags")
+						&& !request.containsKey("approvees")) {
+					return ErrorResponse.create("Invalid parameters.");
+				}
 				return findTransactionStatement(request);
 			}
 			case "getBalances": {
+				if (!request.containsKey("addresses") || !request.containsKey("threshold")) {
+					return ErrorResponse.create("Invalid parameters.");
+				}
 				final List<String> addresses = (List<String>) request.get("addresses");
+				for (final String address : addresses) {
+					if (!validTrytes(address, HASH_SIZE, ZERO_LENGTH_NOT_ALLOWED)) {
+						return ErrorResponse.create("Invalid addresses input.");
+					}
+				}
 				final int threshold = ((Double) request.get("threshold")).intValue();
 				return getBalancesStatement(addresses, threshold);
 			}
 			case "getInclusionStates": {
+				if (!request.containsKey("transactions") || !request.containsKey("tips")) {
+					return ErrorResponse.create("Invalid parameters.");
+				}
 				final List<String> trans = (List<String>) request.get("transactions");
 				final List<String> tps = (List<String>) request.get("tips");
 
-				if (trans == null || tps == null) {
-					return ErrorResponse.create("getInclusionStates Bad Request.");
+				for (final String tx : trans) {
+					if (!validTrytes(tx, HASH_SIZE, ZERO_LENGTH_NOT_ALLOWED)) {
+						return ErrorResponse.create("Invalid transactions input.");
+					}
+				}
+				for (final String ti : tps) {
+					if (!validTrytes(ti, HASH_SIZE, ZERO_LENGTH_NOT_ALLOWED)) {
+						return ErrorResponse.create("Invalid tips input.");
+					}
 				}
 
 				if (invalidSubmeshStatus()) {
@@ -227,7 +285,18 @@ public class API {
 				return getTransactionToApproveStatement(depth);
 			}
 			case "getTrytes": {
+				if (!request.containsKey("hashes")) {
+					return ErrorResponse.create("Invalid parameters.");
+				}
 				final List<String> hashes = (List<String>) request.get("hashes");
+				if (hashes == null) {
+					return ErrorResponse.create("Wrong arguments.");
+				}
+				for (final String hash : hashes) {
+					if (!validTrytes(hash, HASH_SIZE, ZERO_LENGTH_ALLOWED)) {
+						return ErrorResponse.create("Invalid hash input.");
+					}
+				}
 				log.debug("Executing getTrytesStatement: {}", hashes);
 				return getTrytesStatement(hashes);
 			}
@@ -236,6 +305,9 @@ public class API {
 				return AbstractResponse.createEmptyResponse();
 			}
 			case "storeTransactions": {
+				if (!request.containsKey("trytes")) {
+					return ErrorResponse.create("Invalid parameters.");
+				}
 				List<String> trytes = (List<String>) request.get("trytes");
 				log.debug("Invoking 'storeTransactions' with {}", trytes);
 				return storeTransactionStatement(trytes);
@@ -269,11 +341,11 @@ public class API {
 	private synchronized AbstractResponse getTransactionToApproveStatement(final int depth) {
 		final Hash trunkTransactionToApprove = TipsManager.transactionToApprove(null, depth);
 		if (trunkTransactionToApprove == null) {
-			return ErrorResponse.create("The Submesh is not solid");
+			return ErrorResponse.create("The Submesh is not solid.");
 		}
 		final Hash branchTransactionToApprove = TipsManager.transactionToApprove(trunkTransactionToApprove, depth);
 		if (branchTransactionToApprove == null) {
-			return ErrorResponse.create("The Submesh is not solid");
+			return ErrorResponse.create("The Submesh is not solid.");
 		}
 		return GetTransactionsToApproveResponse.create(trunkTransactionToApprove, branchTransactionToApprove);
 	}
@@ -285,6 +357,9 @@ public class API {
 
 	private AbstractResponse storeTransactionStatement(final List<String> trys) {
 		for (final String trytes : trys) {
+			if (!validTrytes(trytes, TRYTES_SIZE, ZERO_LENGTH_NOT_ALLOWED)) {
+				return ErrorResponse.create("Invalid trytes input.");
+			}
 			final Transaction transaction = new Transaction(Converter.trits(trytes));
 			StorageTransactions.instance().storeTransaction(transaction.hash, transaction, false);
 		}
@@ -429,7 +504,7 @@ public class API {
 	private AbstractResponse getBalancesStatement(final List<String> addrss, final int threshold) {
 
 		if (threshold <= 0 || threshold > 100) {
-			return ErrorResponse.create("Illegal 'threshold'");
+			return ErrorResponse.create("Illegal 'threshold'.");
 		}
 
 		final List<Hash> addresses = addrss.stream().map(address -> (new Hash(address)))
@@ -478,14 +553,35 @@ public class API {
 		return GetBalancesResponse.create(elements, milestone, milestoneIndex);
 	}
 
-	private synchronized AbstractResponse attachToMeshStatement(final Hash trunkTransaction,
-			final Hash branchTransaction, final int minWeightMagnitude, final List<String> trytes) {
+	
+	private static int counter_PoW = 0;
+
+	public static int getCounter_PoW() {
+		return counter_PoW;
+	}
+
+	public static void incCounter_PoW() {
+		API.counter_PoW++;
+	}
+
+	private static long ellapsedTime_PoW = 0L;
+
+	public static long getEllapsedTime_PoW() {
+		return ellapsedTime_PoW;
+	}
+
+	public static void incEllapsedTime_PoW(long ellapsedTime) {
+		ellapsedTime_PoW += ellapsedTime;
+	}
+
+	public synchronized AbstractResponse attachToMeshStatement(final Hash trunkTransaction, final Hash branchTransaction,
+			final int minWeightMagnitude, final List<String> trytes) {
 		final List<Transaction> transactions = new LinkedList<>();
 
 		Hash prevTransaction = null;
 
 		for (final String tryte : trytes) {
-
+			long startTime = System.nanoTime();
 			final int[] transactionTrits = Converter.trits(tryte);
 			System.arraycopy((prevTransaction == null ? trunkTransaction : prevTransaction).trits(), 0,
 					transactionTrits, Transaction.TRUNK_TRANSACTION_TRINARY_OFFSET,
@@ -493,7 +589,6 @@ public class API {
 			System.arraycopy((prevTransaction == null ? branchTransaction : trunkTransaction).trits(), 0,
 					transactionTrits, Transaction.BRANCH_TRANSACTION_TRINARY_OFFSET,
 					Transaction.BRANCH_TRANSACTION_TRINARY_SIZE);
-
 			if (!pearlDiver.search(transactionTrits, minWeightMagnitude, 0)) {
 				transactions.clear();
 				break;
@@ -501,6 +596,15 @@ public class API {
 			final Transaction transaction = new Transaction(transactionTrits);
 			transactions.add(transaction);
 			prevTransaction = new Hash(transaction.hash, 0, Transaction.HASH_SIZE);
+			API.incEllapsedTime_PoW(System.nanoTime() - startTime);
+			API.incCounter_PoW();
+			if ((API.getCounter_PoW() % 100) == 0) {
+				String sb = "Last 100 PoW consumed " + API.getEllapsedTime_PoW() / 1000000000L
+						+ " seconds processing time.";
+				log.info(sb);
+				counter_PoW = 0;
+				ellapsedTime_PoW = 0L;
+			}
 		}
 
 		final List<String> elements = new LinkedList<>();
@@ -582,6 +686,17 @@ public class API {
 			}
 		});
 		sinkChannel.resumeWrites();
+	}
+
+	private boolean validTrytes(String trytes, int minimalLength, char zeroAllowed) {
+		if (trytes.length() == 0 && zeroAllowed == ZERO_LENGTH_ALLOWED) {
+			return true;
+		}
+		if (trytes.length() < minimalLength) {
+			return false;
+		}
+		Matcher matcher = trytesPattern.matcher(trytes);
+		return matcher.matches();
 	}
 
 	private static void setupResponseHeaders(final HttpServerExchange exchange) {
