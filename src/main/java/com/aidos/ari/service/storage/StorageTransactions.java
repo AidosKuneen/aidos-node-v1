@@ -10,9 +10,6 @@ import java.util.LinkedList;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.aidos.ari.conf.Configuration;
-import com.aidos.ari.conf.Configuration.DefaultConfSettings;
 import com.aidos.ari.model.Hash;
 import com.aidos.ari.model.Transaction;
 import com.aidos.ari.service.storage.AbstractStorage;
@@ -22,8 +19,7 @@ public class StorageTransactions extends AbstractStorage {
 	private static final Logger log = LoggerFactory.getLogger(StorageTransactions.class);
 
 	private static final StorageTransactions instance = new StorageTransactions();
-	private static final String TRANSACTIONS_FILE_NAME = Configuration.booling(DefaultConfSettings.TESTNET)
-			? "transactions.store.testnet" : "transactions.store";
+	private static final String TRANSACTIONS_FILE_NAME = "transactions.store.testnet";
 
 	private FileChannel transactionsChannel;
 	private ByteBuffer transactionsTipsFlags;

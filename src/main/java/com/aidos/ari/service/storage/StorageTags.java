@@ -9,9 +9,6 @@ import java.util.LinkedList;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.aidos.ari.conf.Configuration;
-import com.aidos.ari.conf.Configuration.DefaultConfSettings;
 import com.aidos.ari.model.Transaction;
 
 public class StorageTags extends AbstractStorage {
@@ -24,8 +21,7 @@ public class StorageTags extends AbstractStorage {
 	private final ByteBuffer[] tagsChunks = new ByteBuffer[MAX_NUMBER_OF_CHUNKS];
 	private volatile long tagsNextPointer = SUPER_GROUPS_SIZE;
 
-	private static final String TAGS_FILE_NAME = Configuration.booling(DefaultConfSettings.TESTNET)
-			? "tags.store.testnet" : "tags.store";
+	private static final String TAGS_FILE_NAME = "tags.store.testnet";
 
 	@Override
 	public void init() throws IOException {

@@ -9,9 +9,6 @@ import java.util.LinkedList;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.aidos.ari.conf.Configuration;
-import com.aidos.ari.conf.Configuration.DefaultConfSettings;
 import com.aidos.ari.model.Hash;
 import com.aidos.ari.model.Transaction;
 
@@ -20,8 +17,7 @@ public class StorageAddresses extends AbstractStorage {
 	private static final Logger log = LoggerFactory.getLogger(StorageAddresses.class);
 
 	private static final StorageAddresses instance = new StorageAddresses();
-	private static final String ADDRESSES_FILE_NAME = Configuration.booling(DefaultConfSettings.TESTNET)
-			? "addresses.store.testnet" : "addresses.store";
+	private static final String ADDRESSES_FILE_NAME = "addresses.store.testnet";
 
 	private FileChannel addressesChannel;
 	private final ByteBuffer[] addressesChunks = new ByteBuffer[MAX_NUMBER_OF_CHUNKS];

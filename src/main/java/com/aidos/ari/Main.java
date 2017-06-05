@@ -19,16 +19,13 @@ public class Main {
 
 	private static final Logger log = LoggerFactory.getLogger(Main.class);
 
-	public static final String NAME = "ARI";
-	public static final String TESTNET_NAME = "ARI Testnet";
+	public static final String NAME = "ARI Testnet";
 	public static final String VERSION = "1.0.1.0";
 
 	public static void main(final String[] args) {
 
+		log.info("Welcome to {} {}", NAME, VERSION);
 		validateParams(args);
-
-		log.info("Welcome to {} {}", Configuration.booling(DefaultConfSettings.TESTNET) ? TESTNET_NAME : NAME, VERSION);
-
 		shutdownHook();
 
 		try {
@@ -85,7 +82,9 @@ public class Main {
 
 		if (parser.getOptionValue(testnet) != null) {
 			Configuration.put(DefaultConfSettings.TESTNET, "true");
-			Configuration.put(DefaultConfSettings.API_PORT, "15555");
+		} else {
+			log.error("This version is usable for the Testnet only.");
+			printUsage();
 		}
 
 		final String vrport = parser.getOptionValue(rport);
@@ -93,8 +92,7 @@ public class Main {
 			log.error("Invalid arguments list. You have to specify the port.");
 			printUsage();
 		}
-		if (vrport.equals(Configuration.string(DefaultConfSettings.MESH_RECEIVER_PORT))
-				&& Configuration.booling(DefaultConfSettings.TESTNET)) {
+		if (vrport.equals("14265") && Configuration.booling(DefaultConfSettings.TESTNET)) {
 			log.error("You need to run the Testnet on a different port than the default meshport.");
 			printUsage();
 		}
@@ -108,7 +106,7 @@ public class Main {
 					"Peer Discovery enabled. Binding API socket to listen any interface and limiting remote API commands.");
 			Configuration.put(DefaultConfSettings.API_HOST, "0.0.0.0");
 		} else if (save_remote_wallet == null) {
-			log.error("Invalid arguments list. You have to either use -p / --peer-discovery or -w / --remote-wallet.'");
+			log.error("Invalid arguments list. You have to either use -p / --peer-discovery or -w / --remote-wallet.");
 			printUsage();
 		}
 

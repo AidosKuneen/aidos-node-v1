@@ -20,9 +20,9 @@ public class Configuration {
 
 	static {
 		// defaults
-		conf.put(DefaultConfSettings.API_PORT.name(), "14266");
+		conf.put(DefaultConfSettings.API_PORT.name(), "15555");
 		conf.put(DefaultConfSettings.API_HOST.name(), "localhost");
-		conf.put(DefaultConfSettings.MESH_RECEIVER_PORT.name(), "14265");
+		conf.put(DefaultConfSettings.MESH_RECEIVER_PORT.name(), "15777");
 		conf.put(DefaultConfSettings.CORS_ENABLED.name(), "*");
 		conf.put(DefaultConfSettings.DEBUG.name(), "false");
 		// only remote allow: ping addPeer and getPeerAddresses

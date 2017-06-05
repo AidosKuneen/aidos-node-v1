@@ -11,8 +11,6 @@ import java.util.Queue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.aidos.ari.Milestone;
-import com.aidos.ari.conf.Configuration;
-import com.aidos.ari.conf.Configuration.DefaultConfSettings;
 import com.aidos.ari.model.Hash;
 import com.aidos.ari.model.Transaction;
 
@@ -21,8 +19,7 @@ public class StorageScratchpad extends AbstractStorage {
 	private static final Logger log = LoggerFactory.getLogger(StorageScratchpad.class);
 
 	private static final StorageScratchpad instance = new StorageScratchpad();
-	private static final String SCRATCHPAD_FILE_NAME = Configuration.booling(DefaultConfSettings.TESTNET)
-			? "scratchpad.store.testnet" : "scratchpad.store";
+	private static final String SCRATCHPAD_FILE_NAME = "scratchpad.store.testnet";
 
 	private ByteBuffer transactionsToRequest;
 	private ByteBuffer analyzedTransactionsFlags, analyzedTransactionsFlagsCopy;

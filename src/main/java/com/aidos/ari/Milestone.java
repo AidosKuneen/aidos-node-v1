@@ -31,9 +31,8 @@ public class Milestone {
 	public static InetSocketAddress[] milestoneIp = null;
 
 	// Address of Milestone Wallet Address
-	public static final Hash COORDINATOR = Configuration.booling(DefaultConfSettings.TESTNET)
-			? new Hash("GKDKHMIGVU9FYFYCFFWREXPQEFDFNEPRRIWDRJDDRDVTNNKBXABPFDQTEHKUXXPPQXXS9YOITKFIYYFHS")
-			: new Hash("HZSMDORPCAFJJJNEEWZSP9OCQZAHCAVPBAXUTJKRCYZXMSNGERFZLQPNWOQQHK9RMJO9PNSVV9KR9DONH");
+	public static final Hash COORDINATOR = new Hash(
+			"GKDKHMIGVU9FYFYCFFWREXPQEFDFNEPRRIWDRJDDRDVTNNKBXABPFDQTEHKUXXPPQXXS9YOITKFIYYFHS");
 
 	public static Hash latestMilestone = Hash.NULL_HASH;
 	public static Hash latestSolidSubmeshMilestone = Hash.NULL_HASH;

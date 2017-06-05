@@ -72,7 +72,7 @@ public class Transaction {
 			ESSENCE_TRINARY_SIZE = ADDRESS_TRINARY_SIZE + VALUE_TRINARY_SIZE + TAG_TRINARY_SIZE + TIMESTAMP_TRINARY_SIZE
 					+ CURRENT_INDEX_TRINARY_SIZE + LAST_INDEX_TRINARY_SIZE;
 
-	private static final int MIN_WEIGHT_MAGNITUDE = Configuration.booling(DefaultConfSettings.TESTNET) ? 10 : 18;
+	private static final int MIN_WEIGHT_MAGNITUDE = 10;
 
 	public final int type;
 
@@ -151,10 +151,11 @@ public class Transaction {
 		curl.squeeze(hashTrits, 0, hashTrits.length);
 
 		hash = Converter.bytes(hashTrits);
-		if ((hash[Hash.SIZE_IN_BYTES - 4] != 0 || hash[Hash.SIZE_IN_BYTES - 3] != 0 || hash[Hash.SIZE_IN_BYTES - 2] != 0
-				|| hash[Hash.SIZE_IN_BYTES - 1] != 0) && !Configuration.booling(DefaultConfSettings.TESTNET)) {
-			throw new RuntimeException("Invalid transaction hash");
-		}
+		// if ((hash[Hash.SIZE_IN_BYTES - 4] != 0 || hash[Hash.SIZE_IN_BYTES - 3] != 0 || hash[Hash.SIZE_IN_BYTES - 2]
+		// != 0
+		// || hash[Hash.SIZE_IN_BYTES - 1] != 0)) {
+		// throw new RuntimeException("Invalid transaction hash");
+		// }
 
 		weightMagnitude = MIN_WEIGHT_MAGNITUDE;
 		while (weightMagnitude < Curl.HASH_LENGTH && hashTrits[Curl.HASH_LENGTH - weightMagnitude - 1] == 0) {
