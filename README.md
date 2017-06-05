@@ -13,8 +13,9 @@ It's based upon Java 8 and therefore a requirement.
 The Testnet is used to thoroughly review and verify new functions and also to offer an non-critical environment for testing.
 It's can also be used to get a start on implementing various integrations for Aidos Kuneen.
 The `minWeightMagnitude` is reduced from `18` to `10`, therefore the Proof of Work is completed much faster in this environment.  
-The Install/Build process is pretty much the same as for the normal ARI. Even though If you don't use the parameter `--testnet` to run the `ari-${version}.jar` you will launch on the Mainnet.
-To be safe the databases are kept separately and have a different file ending (`*.store.testnet`) for the Testnet.
+The Install/Build process is pretty much the same as for the normal ARI.  
+Even though If you don't use the parameter `--testnet` to run the `ari-${version}.jar` you will launch on the Mainnet.
+To be safe the databases are kept separately and have a different file ending (`*.store.testnet`) for the Testnet.  
 The Testnet API runs on port `15555` by default and the ARI won't allow you to use the same default Meshport (`14265`) as in the ARI Mainnet.
 
 ## Install
