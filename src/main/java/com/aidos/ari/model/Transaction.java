@@ -1,9 +1,6 @@
 package com.aidos.ari.model;
 
 import java.util.Arrays;
-
-import com.aidos.ari.conf.Configuration;
-import com.aidos.ari.conf.Configuration.DefaultConfSettings;
 import com.aidos.ari.hash.Curl;
 import com.aidos.ari.service.storage.AbstractStorage;
 import com.aidos.ari.service.storage.Storage;
