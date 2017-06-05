@@ -85,6 +85,7 @@ public class Main {
 
 		if (parser.getOptionValue(testnet) != null) {
 			Configuration.put(DefaultConfSettings.TESTNET, "true");
+			Configuration.put(DefaultConfSettings.API_PORT, "15555");
 		}
 
 		final String vrport = parser.getOptionValue(rport);
