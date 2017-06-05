@@ -9,6 +9,9 @@ import java.util.LinkedList;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.aidos.ari.conf.Configuration;
+import com.aidos.ari.conf.Configuration.DefaultConfSettings;
 import com.aidos.ari.model.Transaction;
 
 public class StorageBundle extends AbstractStorage {
@@ -16,7 +19,8 @@ public class StorageBundle extends AbstractStorage {
 	private static final Logger log = LoggerFactory.getLogger(StorageBundle.class);
 
 	private static final StorageBundle instance = new StorageBundle();
-	private static final String BUNDLES_FILE_NAME = "bundles.store";
+	private static final String BUNDLES_FILE_NAME = Configuration.booling(DefaultConfSettings.TESTNET)
+			? "bundles.store.testnet" : "bundles.store";
 
 	private FileChannel bundlesChannel;
 	private final ByteBuffer[] bundlesChunks = new ByteBuffer[MAX_NUMBER_OF_CHUNKS];

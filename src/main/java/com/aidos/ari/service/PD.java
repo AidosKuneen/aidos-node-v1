@@ -52,7 +52,8 @@ public class PD {
 
 	private static final PD instance = new PD();
 
-	private static final String PD_FILE = "peerlist.store";
+	private static final String PD_FILE = Configuration.booling(DefaultConfSettings.TESTNET) ? "peerlist.store.testnet"
+			: "peerlist.store";
 
 	// Number of nodes that should be added as peers
 	private static final int PEERS_TO_FIND = 6;
@@ -60,8 +61,10 @@ public class PD {
 	// Empty string for "false", or local ip in ipv4/6
 	private static Map<ipType, String> ipMode = new HashMap<ipType, String>();
 	// Seed for test has to be dualstack!
-	private static String ipSeed = "testnetseed1.aidoskuneen.com";
-	private static String SRVEntry = "_testnetseeds._tcp.aidoskuneen.com";
+	private static String ipSeed = Configuration.booling(DefaultConfSettings.TESTNET) ? "testnetseed1.aidoskuneen.com"
+			: "seed1.aidoskuneen.com";
+	private static String SRVEntry = Configuration.booling(DefaultConfSettings.TESTNET)
+			? "_testnetseeds._tcp.aidoskuneen.com" : "_seeds._tcp.aidoskuneen.com";
 
 	private static boolean connect;
 	private static boolean startLocal;

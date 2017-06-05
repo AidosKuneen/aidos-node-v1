@@ -13,14 +13,15 @@ public class Configuration {
 
 	public enum DefaultConfSettings {
 		API_PORT, API_HOST, MESH_RECEIVER_PORT, CORS_ENABLED, PEERS, LOCAL, // not used yet
-		REMOTEAPI, REMOTEWALLET, DEBUG, EXPERIMENTAL // experimental features.
+		REMOTEAPI, REMOTEWALLET, DEBUG, EXPERIMENTAL, TESTNET // experimental features.
 	}
 
 	public static final int CONNECTION_TIMEOUT = 2000; // in ms
-	
+
 	static {
 		// defaults
-		conf.put(DefaultConfSettings.API_PORT.name(), "14266");
+		conf.put(DefaultConfSettings.API_PORT.name(),
+				Configuration.booling(DefaultConfSettings.TESTNET) ? "15555" : "14266");
 		conf.put(DefaultConfSettings.API_HOST.name(), "localhost");
 		conf.put(DefaultConfSettings.MESH_RECEIVER_PORT.name(), "14265");
 		conf.put(DefaultConfSettings.CORS_ENABLED.name(), "*");
@@ -30,6 +31,7 @@ public class Configuration {
 		conf.put(DefaultConfSettings.REMOTEWALLET.name(), "attachToMesh interruptAttachingToMesh");
 		conf.put(DefaultConfSettings.EXPERIMENTAL.name(), "false");
 		conf.put(DefaultConfSettings.LOCAL.name(), "");
+		conf.put(DefaultConfSettings.TESTNET.name(), "false");
 	}
 
 	public static String allSettings() {

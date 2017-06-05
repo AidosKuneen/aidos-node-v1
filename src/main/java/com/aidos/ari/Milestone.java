@@ -11,6 +11,9 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.aidos.ari.conf.Configuration;
+import com.aidos.ari.conf.Configuration.DefaultConfSettings;
 import com.aidos.ari.hash.Curl;
 import com.aidos.ari.hash.ISS;
 import com.aidos.ari.model.Hash;
@@ -26,10 +29,11 @@ public class Milestone {
 	private static final Logger log = LoggerFactory.getLogger(StorageTransactions.class);
 
 	public static InetSocketAddress[] milestoneIp = null;
-	
+
 	// Address of Milestone Wallet Address
-	public static final Hash COORDINATOR = new Hash(
-			"HZSMDORPCAFJJJNEEWZSP9OCQZAHCAVPBAXUTJKRCYZXMSNGERFZLQPNWOQQHK9RMJO9PNSVV9KR9DONH");
+	public static final Hash COORDINATOR = Configuration.booling(DefaultConfSettings.TESTNET)
+			? new Hash("GKDKHMIGVU9FYFYCFFWREXPQEFDFNEPRRIWDRJDDRDVTNNKBXABPFDQTEHKUXXPPQXXS9YOITKFIYYFHS")
+			: new Hash("HZSMDORPCAFJJJNEEWZSP9OCQZAHCAVPBAXUTJKRCYZXMSNGERFZLQPNWOQQHK9RMJO9PNSVV9KR9DONH");
 
 	public static Hash latestMilestone = Hash.NULL_HASH;
 	public static Hash latestSolidSubmeshMilestone = Hash.NULL_HASH;

@@ -20,13 +20,15 @@ public class Main {
 	private static final Logger log = LoggerFactory.getLogger(Main.class);
 
 	public static final String NAME = "ARI";
+	public static final String TESTNET_NAME = "ARI Testnet";
 	public static final String VERSION = "1.0.1.0";
 
 	public static void main(final String[] args) {
 
-		log.info("Welcome to {} {}", NAME, VERSION);
-
 		validateParams(args);
+
+		log.info("Welcome to {} {}", Configuration.booling(DefaultConfSettings.TESTNET) ? TESTNET_NAME : NAME, VERSION);
+
 		shutdownHook();
 
 		try {
@@ -61,6 +63,7 @@ public class Main {
 		final Option<Boolean> debug = parser.addBooleanOption('d', "debug");
 		final Option<Boolean> peer_discovery = parser.addBooleanOption('p', "peer-discovery");
 		final Option<Boolean> remote_wallet = parser.addBooleanOption('w', "remote-wallet");
+		final Option<Boolean> testnet = parser.addBooleanOption("testnet");
 		final Option<Boolean> experimental = parser.addBooleanOption('e', "experimental");
 		final Option<Boolean> help = parser.addBooleanOption('h', "help");
 		final Option<String> local = parser.addStringOption('l', "local");
@@ -72,11 +75,6 @@ public class Main {
 			printUsage();
 			System.exit(2);
 		}
-		
-		log.info("test");
-		log.debug("test");
-		log.warn("test");
-		log.error("test");
 
 		log.info(parser.toString());
 
@@ -85,9 +83,18 @@ public class Main {
 			printUsage();
 		}
 
+		if (parser.getOptionValue(testnet) != null) {
+			Configuration.put(DefaultConfSettings.TESTNET, "true");
+		}
+
 		final String vrport = parser.getOptionValue(rport);
 		if (vrport == null) {
-			log.error("Invalid arguments list. You have to specify the port.'");
+			log.error("Invalid arguments list. You have to specify the port.");
+			printUsage();
+		}
+		if (vrport.equals(Configuration.string(DefaultConfSettings.MESH_RECEIVER_PORT))
+				&& Configuration.booling(DefaultConfSettings.TESTNET)) {
+			log.error("You need to run the Testnet on a different port than the default meshport.");
 			printUsage();
 		}
 		Configuration.put(DefaultConfSettings.MESH_RECEIVER_PORT, vrport);
@@ -150,8 +157,8 @@ public class Main {
 
 	private static void printUsage() {
 		log.info("Usage: java -jar {}-{}.jar " + "[{-r,--receiver-port} 14265] " + "[{-p,--peer-discovery}]"
-				+ "[{-w,--remote-wallet}]" + "[{-l,--local} ipv4/ipv6]" + "[{-c,--enabled-cors} *]" + "[{-d,--debug}]"
-				+ "[{-e,--experimental}]", NAME, VERSION);
+				+ "[{-w,--remote-wallet}]" + "[{-l,--local} ipv4/ipv6]" + "[{--testnet}]" + "[{-c,--enabled-cors} *]"
+				+ "[{-d,--debug}]" + "[{-e,--experimental}]", NAME, VERSION);
 		System.exit(0);
 	}
 

@@ -1,6 +1,9 @@
 package com.aidos.ari.model;
 
 import java.util.Arrays;
+
+import com.aidos.ari.conf.Configuration;
+import com.aidos.ari.conf.Configuration.DefaultConfSettings;
 import com.aidos.ari.hash.Curl;
 import com.aidos.ari.service.storage.AbstractStorage;
 import com.aidos.ari.service.storage.Storage;
@@ -9,240 +12,284 @@ import com.aidos.ari.utils.Converter;
 
 public class Transaction {
 
-    public static final int SIZE = 1604;
+	public static final int SIZE = 1604;
 
-    public static final int TYPE_OFFSET = 0, TYPE_SIZE = Byte.BYTES;
-    public static final int HASH_OFFSET = TYPE_OFFSET + TYPE_SIZE + ((Long.BYTES - (TYPE_SIZE & (Long.BYTES - 1))) & (Long.BYTES - 1)), HASH_SIZE = 46;
+	public static final int TYPE_OFFSET = 0, TYPE_SIZE = Byte.BYTES;
+	public static final int HASH_OFFSET = TYPE_OFFSET + TYPE_SIZE
+			+ ((Long.BYTES - (TYPE_SIZE & (Long.BYTES - 1))) & (Long.BYTES - 1)), HASH_SIZE = 46;
 
-    private static final int BYTES_OFFSET = HASH_OFFSET + HASH_SIZE + ((Long.BYTES - (HASH_SIZE & (Long.BYTES - 1))) & (Long.BYTES - 1)), BYTES_SIZE = SIZE;
+	private static final int BYTES_OFFSET = HASH_OFFSET + HASH_SIZE
+			+ ((Long.BYTES - (HASH_SIZE & (Long.BYTES - 1))) & (Long.BYTES - 1)), BYTES_SIZE = SIZE;
 
-    public static final int ADDRESS_OFFSET = BYTES_OFFSET + BYTES_SIZE + ((Long.BYTES - (BYTES_SIZE & (Long.BYTES - 1))) & (Long.BYTES - 1)), ADDRESS_SIZE = 49;
-    public static final int VALUE_OFFSET = ADDRESS_OFFSET + ADDRESS_SIZE + ((Long.BYTES - (ADDRESS_SIZE & (Long.BYTES - 1))) & (Long.BYTES - 1)), VALUE_SIZE = Long.BYTES;
-    public static final int TAG_OFFSET = VALUE_OFFSET + VALUE_SIZE + ((Long.BYTES - (VALUE_SIZE & (Long.BYTES - 1))) & (Long.BYTES - 1)), TAG_SIZE = 17;
-    private static final int CURRENT_INDEX_OFFSET = TAG_OFFSET + TAG_SIZE + ((Long.BYTES - (TAG_SIZE & (Long.BYTES - 1))) & (Long.BYTES - 1)), CURRENT_INDEX_SIZE = Long.BYTES;
-    private static final int LAST_INDEX_OFFSET = CURRENT_INDEX_OFFSET + CURRENT_INDEX_SIZE + ((Long.BYTES - (CURRENT_INDEX_SIZE & (Long.BYTES - 1))) & (Long.BYTES - 1)), LAST_INDEX_SIZE = Long.BYTES;
-    public static final int BUNDLE_OFFSET = LAST_INDEX_OFFSET + LAST_INDEX_SIZE + ((Long.BYTES - (LAST_INDEX_SIZE & (Long.BYTES - 1))) & (Long.BYTES - 1)), BUNDLE_SIZE = 49;
-    private static final int TRUNK_TRANSACTION_OFFSET = BUNDLE_OFFSET + BUNDLE_SIZE + ((Long.BYTES - (BUNDLE_SIZE & (Long.BYTES - 1))) & (Long.BYTES - 1)), TRUNK_TRANSACTION_SIZE = HASH_SIZE;
-    private static final int BRANCH_TRANSACTION_OFFSET = TRUNK_TRANSACTION_OFFSET + TRUNK_TRANSACTION_SIZE + ((Long.BYTES - (TRUNK_TRANSACTION_SIZE & (Long.BYTES - 1))) & (Long.BYTES - 1)), BRANCH_TRANSACTION_SIZE = HASH_SIZE;
+	public static final int ADDRESS_OFFSET = BYTES_OFFSET + BYTES_SIZE
+			+ ((Long.BYTES - (BYTES_SIZE & (Long.BYTES - 1))) & (Long.BYTES - 1)), ADDRESS_SIZE = 49;
+	public static final int VALUE_OFFSET = ADDRESS_OFFSET + ADDRESS_SIZE
+			+ ((Long.BYTES - (ADDRESS_SIZE & (Long.BYTES - 1))) & (Long.BYTES - 1)), VALUE_SIZE = Long.BYTES;
+	public static final int TAG_OFFSET = VALUE_OFFSET + VALUE_SIZE
+			+ ((Long.BYTES - (VALUE_SIZE & (Long.BYTES - 1))) & (Long.BYTES - 1)), TAG_SIZE = 17;
+	private static final int CURRENT_INDEX_OFFSET = TAG_OFFSET + TAG_SIZE
+			+ ((Long.BYTES - (TAG_SIZE & (Long.BYTES - 1))) & (Long.BYTES - 1)), CURRENT_INDEX_SIZE = Long.BYTES;
+	private static final int LAST_INDEX_OFFSET = CURRENT_INDEX_OFFSET + CURRENT_INDEX_SIZE
+			+ ((Long.BYTES - (CURRENT_INDEX_SIZE & (Long.BYTES - 1))) & (Long.BYTES - 1)), LAST_INDEX_SIZE = Long.BYTES;
+	public static final int BUNDLE_OFFSET = LAST_INDEX_OFFSET + LAST_INDEX_SIZE
+			+ ((Long.BYTES - (LAST_INDEX_SIZE & (Long.BYTES - 1))) & (Long.BYTES - 1)), BUNDLE_SIZE = 49;
+	private static final int TRUNK_TRANSACTION_OFFSET = BUNDLE_OFFSET + BUNDLE_SIZE
+			+ ((Long.BYTES - (BUNDLE_SIZE & (Long.BYTES - 1))) & (Long.BYTES - 1)), TRUNK_TRANSACTION_SIZE = HASH_SIZE;
+	private static final int BRANCH_TRANSACTION_OFFSET = TRUNK_TRANSACTION_OFFSET + TRUNK_TRANSACTION_SIZE
+			+ ((Long.BYTES - (TRUNK_TRANSACTION_SIZE & (Long.BYTES - 1))) & (Long.BYTES - 1)),
+			BRANCH_TRANSACTION_SIZE = HASH_SIZE;
 
-    public static final int VALIDITY_OFFSET = BRANCH_TRANSACTION_OFFSET + BRANCH_TRANSACTION_SIZE + ((Long.BYTES - (BRANCH_TRANSACTION_SIZE & (Long.BYTES - 1))) & (Long.BYTES - 1)), VALIDITY_SIZE = 1;
+	public static final int VALIDITY_OFFSET = BRANCH_TRANSACTION_OFFSET + BRANCH_TRANSACTION_SIZE
+			+ ((Long.BYTES - (BRANCH_TRANSACTION_SIZE & (Long.BYTES - 1))) & (Long.BYTES - 1)), VALIDITY_SIZE = 1;
 
-    public static final long SUPPLY = 2500000000000000L; //25 mil adk = 25 bil units
+	public static final long SUPPLY = 2500000000000000L; // 25 mil adk = 25 bil units
 
-    public static final int SIGNATURE_MESSAGE_FRAGMENT_TRINARY_OFFSET = 0, SIGNATURE_MESSAGE_FRAGMENT_TRINARY_SIZE = 6561;
-    public static final int ADDRESS_TRINARY_OFFSET = SIGNATURE_MESSAGE_FRAGMENT_TRINARY_OFFSET + SIGNATURE_MESSAGE_FRAGMENT_TRINARY_SIZE, ADDRESS_TRINARY_SIZE = 243;
-    public static final int VALUE_TRINARY_OFFSET = ADDRESS_TRINARY_OFFSET + ADDRESS_TRINARY_SIZE, VALUE_TRINARY_SIZE = 81, VALUE_USABLE_TRINARY_SIZE = 33;
-    public static final int TAG_TRINARY_OFFSET = VALUE_TRINARY_OFFSET + VALUE_TRINARY_SIZE, TAG_TRINARY_SIZE = 81;
-    private static final int TIMESTAMP_TRINARY_OFFSET = TAG_TRINARY_OFFSET + TAG_TRINARY_SIZE, TIMESTAMP_TRINARY_SIZE = 27;
-    public static final int CURRENT_INDEX_TRINARY_OFFSET = TIMESTAMP_TRINARY_OFFSET + TIMESTAMP_TRINARY_SIZE, CURRENT_INDEX_TRINARY_SIZE = 27;
-    private static final int LAST_INDEX_TRINARY_OFFSET = CURRENT_INDEX_TRINARY_OFFSET + CURRENT_INDEX_TRINARY_SIZE, LAST_INDEX_TRINARY_SIZE = 27;
-    public static final int BUNDLE_TRINARY_OFFSET = LAST_INDEX_TRINARY_OFFSET + LAST_INDEX_TRINARY_SIZE, BUNDLE_TRINARY_SIZE = 243;
-    public static final int TRUNK_TRANSACTION_TRINARY_OFFSET = BUNDLE_TRINARY_OFFSET + BUNDLE_TRINARY_SIZE, TRUNK_TRANSACTION_TRINARY_SIZE = 243;
-    public static final int BRANCH_TRANSACTION_TRINARY_OFFSET = TRUNK_TRANSACTION_TRINARY_OFFSET + TRUNK_TRANSACTION_TRINARY_SIZE, BRANCH_TRANSACTION_TRINARY_SIZE = 243;
-    private static final int NONCE_TRINARY_OFFSET = BRANCH_TRANSACTION_TRINARY_OFFSET + BRANCH_TRANSACTION_TRINARY_SIZE, NONCE_TRINARY_SIZE = 243;
+	public static final int SIGNATURE_MESSAGE_FRAGMENT_TRINARY_OFFSET = 0,
+			SIGNATURE_MESSAGE_FRAGMENT_TRINARY_SIZE = 6561;
+	public static final int ADDRESS_TRINARY_OFFSET = SIGNATURE_MESSAGE_FRAGMENT_TRINARY_OFFSET
+			+ SIGNATURE_MESSAGE_FRAGMENT_TRINARY_SIZE, ADDRESS_TRINARY_SIZE = 243;
+	public static final int VALUE_TRINARY_OFFSET = ADDRESS_TRINARY_OFFSET + ADDRESS_TRINARY_SIZE,
+			VALUE_TRINARY_SIZE = 81, VALUE_USABLE_TRINARY_SIZE = 33;
+	public static final int TAG_TRINARY_OFFSET = VALUE_TRINARY_OFFSET + VALUE_TRINARY_SIZE, TAG_TRINARY_SIZE = 81;
+	private static final int TIMESTAMP_TRINARY_OFFSET = TAG_TRINARY_OFFSET + TAG_TRINARY_SIZE,
+			TIMESTAMP_TRINARY_SIZE = 27;
+	public static final int CURRENT_INDEX_TRINARY_OFFSET = TIMESTAMP_TRINARY_OFFSET + TIMESTAMP_TRINARY_SIZE,
+			CURRENT_INDEX_TRINARY_SIZE = 27;
+	private static final int LAST_INDEX_TRINARY_OFFSET = CURRENT_INDEX_TRINARY_OFFSET + CURRENT_INDEX_TRINARY_SIZE,
+			LAST_INDEX_TRINARY_SIZE = 27;
+	public static final int BUNDLE_TRINARY_OFFSET = LAST_INDEX_TRINARY_OFFSET + LAST_INDEX_TRINARY_SIZE,
+			BUNDLE_TRINARY_SIZE = 243;
+	public static final int TRUNK_TRANSACTION_TRINARY_OFFSET = BUNDLE_TRINARY_OFFSET + BUNDLE_TRINARY_SIZE,
+			TRUNK_TRANSACTION_TRINARY_SIZE = 243;
+	public static final int BRANCH_TRANSACTION_TRINARY_OFFSET = TRUNK_TRANSACTION_TRINARY_OFFSET
+			+ TRUNK_TRANSACTION_TRINARY_SIZE, BRANCH_TRANSACTION_TRINARY_SIZE = 243;
+	private static final int NONCE_TRINARY_OFFSET = BRANCH_TRANSACTION_TRINARY_OFFSET + BRANCH_TRANSACTION_TRINARY_SIZE,
+			NONCE_TRINARY_SIZE = 243;
 
-    public static final int TRINARY_SIZE = NONCE_TRINARY_OFFSET + NONCE_TRINARY_SIZE;
+	public static final int TRINARY_SIZE = NONCE_TRINARY_OFFSET + NONCE_TRINARY_SIZE;
 
-    public static final int ESSENCE_TRINARY_OFFSET = ADDRESS_TRINARY_OFFSET, ESSENCE_TRINARY_SIZE = ADDRESS_TRINARY_SIZE + VALUE_TRINARY_SIZE + TAG_TRINARY_SIZE + TIMESTAMP_TRINARY_SIZE + CURRENT_INDEX_TRINARY_SIZE + LAST_INDEX_TRINARY_SIZE;
+	public static final int ESSENCE_TRINARY_OFFSET = ADDRESS_TRINARY_OFFSET,
+			ESSENCE_TRINARY_SIZE = ADDRESS_TRINARY_SIZE + VALUE_TRINARY_SIZE + TAG_TRINARY_SIZE + TIMESTAMP_TRINARY_SIZE
+					+ CURRENT_INDEX_TRINARY_SIZE + LAST_INDEX_TRINARY_SIZE;
 
-    private static final int MIN_WEIGHT_MAGNITUDE = 18;
+	private static final int MIN_WEIGHT_MAGNITUDE = Configuration.booling(DefaultConfSettings.TESTNET) ? 10 : 18;
 
-    public final int type;
-    
-    public final byte[] hash;
-    public final byte[] bytes; // stores entire tx bytes. message occupies always first part named 'signatureMessageFragment'
-    public final byte[] address;
-    
-    public final long value; // <0 spending transaction, >=0 deposit transaction / message
-    
-    public final byte[] tag; // milestone index only for milestone tx. Otherwise, arbitrary up to the tx issuer.
-    public final long currentIndex; // index of tx in the bundle
-    public final long lastIndex; // lastIndex is curIndex of the last tx from the same bundle
-    
-    public final byte[] bundle;
-    public final byte[] trunkTransaction;
-    public final byte[] branchTransaction;
+	public final int type;
 
-    public long trunkTransactionPointer;
-    public long branchTransactionPointer;
-    private final int validity;
+	public final byte[] hash;
+	public final byte[] bytes; // stores entire tx bytes. message occupies always first part named
+								// 'signatureMessageFragment'
+	public final byte[] address;
 
-    private int[] trits;
-    public final long pointer;
-    public int weightMagnitude;
+	public final long value; // <0 spending transaction, >=0 deposit transaction / message
 
-    public Transaction(final int[] trits) {
+	public final byte[] tag; // milestone index only for milestone tx. Otherwise, arbitrary up to the tx issuer.
+	public final long currentIndex; // index of tx in the bundle
+	public final long lastIndex; // lastIndex is curIndex of the last tx from the same bundle
 
-        this.trits = trits;
-        bytes = Converter.bytes(trits);
+	public final byte[] bundle;
+	public final byte[] trunkTransaction;
+	public final byte[] branchTransaction;
 
-        final Curl curl = new Curl();
-        curl.absorb(trits, 0, TRINARY_SIZE);
-        final int[] hashTrits = new int[Curl.HASH_LENGTH];
-        curl.squeeze(hashTrits, 0, hashTrits.length);
-        hash = Arrays.copyOf(Converter.bytes(hashTrits), HASH_SIZE);
+	public long trunkTransactionPointer;
+	public long branchTransactionPointer;
+	private final int validity;
 
-        address = Converter.bytes(trits, ADDRESS_TRINARY_OFFSET, ADDRESS_TRINARY_SIZE);
-        value = Converter.longValue(trits, VALUE_TRINARY_OFFSET, VALUE_USABLE_TRINARY_SIZE);
-        System.arraycopy(Converter.bytes(trits, TAG_TRINARY_OFFSET, TAG_TRINARY_SIZE), 0, tag = new byte[TAG_SIZE], 0, TAG_SIZE);
-        currentIndex = Converter.longValue(trits, CURRENT_INDEX_TRINARY_OFFSET, CURRENT_INDEX_TRINARY_SIZE);
-        lastIndex = Converter.longValue(trits, LAST_INDEX_TRINARY_OFFSET, LAST_INDEX_TRINARY_SIZE);
-        System.arraycopy(Converter.bytes(trits, BUNDLE_TRINARY_OFFSET, BUNDLE_TRINARY_SIZE), 0, bundle = new byte[BUNDLE_SIZE], 0, BUNDLE_SIZE);
-        System.arraycopy(Converter.bytes(trits, TRUNK_TRANSACTION_TRINARY_OFFSET, TRUNK_TRANSACTION_TRINARY_SIZE), 0, trunkTransaction = new byte[TRUNK_TRANSACTION_SIZE], 0, TRUNK_TRANSACTION_SIZE);
-        System.arraycopy(Converter.bytes(trits, BRANCH_TRANSACTION_TRINARY_OFFSET, BRANCH_TRANSACTION_TRINARY_SIZE), 0, branchTransaction = new byte[BRANCH_TRANSACTION_SIZE], 0, BRANCH_TRANSACTION_SIZE);
+	private int[] trits;
+	public final long pointer;
+	public int weightMagnitude;
 
-        type = Storage.FILLED_SLOT;
+	public Transaction(final int[] trits) {
 
-        trunkTransactionPointer = 0;
-        branchTransactionPointer = 0;
-        validity = 0;
+		this.trits = trits;
+		bytes = Converter.bytes(trits);
 
-        pointer = 0;
-    }
+		final Curl curl = new Curl();
+		curl.absorb(trits, 0, TRINARY_SIZE);
+		final int[] hashTrits = new int[Curl.HASH_LENGTH];
+		curl.squeeze(hashTrits, 0, hashTrits.length);
+		hash = Arrays.copyOf(Converter.bytes(hashTrits), HASH_SIZE);
 
-    public Transaction(final byte[] bytes, final int[] trits, final Curl curl) {
+		address = Converter.bytes(trits, ADDRESS_TRINARY_OFFSET, ADDRESS_TRINARY_SIZE);
+		value = Converter.longValue(trits, VALUE_TRINARY_OFFSET, VALUE_USABLE_TRINARY_SIZE);
+		System.arraycopy(Converter.bytes(trits, TAG_TRINARY_OFFSET, TAG_TRINARY_SIZE), 0, tag = new byte[TAG_SIZE], 0,
+				TAG_SIZE);
+		currentIndex = Converter.longValue(trits, CURRENT_INDEX_TRINARY_OFFSET, CURRENT_INDEX_TRINARY_SIZE);
+		lastIndex = Converter.longValue(trits, LAST_INDEX_TRINARY_OFFSET, LAST_INDEX_TRINARY_SIZE);
+		System.arraycopy(Converter.bytes(trits, BUNDLE_TRINARY_OFFSET, BUNDLE_TRINARY_SIZE), 0,
+				bundle = new byte[BUNDLE_SIZE], 0, BUNDLE_SIZE);
+		System.arraycopy(Converter.bytes(trits, TRUNK_TRANSACTION_TRINARY_OFFSET, TRUNK_TRANSACTION_TRINARY_SIZE), 0,
+				trunkTransaction = new byte[TRUNK_TRANSACTION_SIZE], 0, TRUNK_TRANSACTION_SIZE);
+		System.arraycopy(Converter.bytes(trits, BRANCH_TRANSACTION_TRINARY_OFFSET, BRANCH_TRANSACTION_TRINARY_SIZE), 0,
+				branchTransaction = new byte[BRANCH_TRANSACTION_SIZE], 0, BRANCH_TRANSACTION_SIZE);
 
-        this.bytes = Arrays.copyOf(bytes, BYTES_SIZE);
-        Converter.getTrits(this.bytes, this.trits = trits);
+		type = Storage.FILLED_SLOT;
 
-        for (int i = VALUE_TRINARY_OFFSET + VALUE_USABLE_TRINARY_SIZE; i < VALUE_TRINARY_OFFSET + VALUE_TRINARY_SIZE; i++) {
+		trunkTransactionPointer = 0;
+		branchTransactionPointer = 0;
+		validity = 0;
 
-            if (trits[i] != 0) {
-                throw new RuntimeException("Invalid transaction value");
-            }
-        }
+		pointer = 0;
+	}
 
-        curl.reset();
-        curl.absorb(trits, 0, TRINARY_SIZE);
-        final int[] hashTrits = new int[Curl.HASH_LENGTH];
-        curl.squeeze(hashTrits, 0, hashTrits.length);
+	public Transaction(final byte[] bytes, final int[] trits, final Curl curl) {
 
-        hash = Converter.bytes(hashTrits);
-        if (hash[Hash.SIZE_IN_BYTES - 4] != 0 || hash[Hash.SIZE_IN_BYTES - 3] != 0 || hash[Hash.SIZE_IN_BYTES - 2] != 0 || hash[Hash.SIZE_IN_BYTES - 1] != 0) {
-            throw new RuntimeException("Invalid transaction hash");
-        }
+		this.bytes = Arrays.copyOf(bytes, BYTES_SIZE);
+		Converter.getTrits(this.bytes, this.trits = trits);
 
-        weightMagnitude = MIN_WEIGHT_MAGNITUDE;
-        while (weightMagnitude < Curl.HASH_LENGTH && hashTrits[Curl.HASH_LENGTH - weightMagnitude - 1] == 0) {
-            weightMagnitude++;
-        }
+		for (int i = VALUE_TRINARY_OFFSET + VALUE_USABLE_TRINARY_SIZE; i < VALUE_TRINARY_OFFSET
+				+ VALUE_TRINARY_SIZE; i++) {
 
-        address = Converter.bytes(trits, ADDRESS_TRINARY_OFFSET, ADDRESS_TRINARY_SIZE);
-        value = Converter.longValue(trits, VALUE_TRINARY_OFFSET, VALUE_USABLE_TRINARY_SIZE);
-        System.arraycopy(Converter.bytes(trits, TAG_TRINARY_OFFSET, TAG_TRINARY_SIZE), 0, tag = new byte[TAG_SIZE], 0, TAG_SIZE);
-        currentIndex = Converter.longValue(trits, CURRENT_INDEX_TRINARY_OFFSET, CURRENT_INDEX_TRINARY_SIZE);
-        lastIndex = Converter.longValue(trits, LAST_INDEX_TRINARY_OFFSET, LAST_INDEX_TRINARY_SIZE);
-        System.arraycopy(Converter.bytes(trits, BUNDLE_TRINARY_OFFSET, BUNDLE_TRINARY_SIZE), 0, bundle = new byte[BUNDLE_SIZE], 0, BUNDLE_SIZE);
-        System.arraycopy(Converter.bytes(trits, TRUNK_TRANSACTION_TRINARY_OFFSET, TRUNK_TRANSACTION_TRINARY_SIZE), 0, trunkTransaction = new byte[TRUNK_TRANSACTION_SIZE], 0, TRUNK_TRANSACTION_SIZE);
-        System.arraycopy(Converter.bytes(trits, BRANCH_TRANSACTION_TRINARY_OFFSET, BRANCH_TRANSACTION_TRINARY_SIZE), 0, branchTransaction = new byte[BRANCH_TRANSACTION_SIZE], 0, BRANCH_TRANSACTION_SIZE);
+			if (trits[i] != 0) {
+				throw new RuntimeException("Invalid transaction value");
+			}
+		}
 
-        type = Storage.FILLED_SLOT;
+		curl.reset();
+		curl.absorb(trits, 0, TRINARY_SIZE);
+		final int[] hashTrits = new int[Curl.HASH_LENGTH];
+		curl.squeeze(hashTrits, 0, hashTrits.length);
 
-        trunkTransactionPointer = 0;
-        branchTransactionPointer = 0;
-        validity = 0;
+		hash = Converter.bytes(hashTrits);
+		if ((hash[Hash.SIZE_IN_BYTES - 4] != 0 || hash[Hash.SIZE_IN_BYTES - 3] != 0 || hash[Hash.SIZE_IN_BYTES - 2] != 0
+				|| hash[Hash.SIZE_IN_BYTES - 1] != 0) && !Configuration.booling(DefaultConfSettings.TESTNET)) {
+			throw new RuntimeException("Invalid transaction hash");
+		}
 
-        pointer = 0;
-    }
+		weightMagnitude = MIN_WEIGHT_MAGNITUDE;
+		while (weightMagnitude < Curl.HASH_LENGTH && hashTrits[Curl.HASH_LENGTH - weightMagnitude - 1] == 0) {
+			weightMagnitude++;
+		}
 
-    public Transaction(final byte[] mainBuffer, final long pointer) {
+		address = Converter.bytes(trits, ADDRESS_TRINARY_OFFSET, ADDRESS_TRINARY_SIZE);
+		value = Converter.longValue(trits, VALUE_TRINARY_OFFSET, VALUE_USABLE_TRINARY_SIZE);
+		System.arraycopy(Converter.bytes(trits, TAG_TRINARY_OFFSET, TAG_TRINARY_SIZE), 0, tag = new byte[TAG_SIZE], 0,
+				TAG_SIZE);
+		currentIndex = Converter.longValue(trits, CURRENT_INDEX_TRINARY_OFFSET, CURRENT_INDEX_TRINARY_SIZE);
+		lastIndex = Converter.longValue(trits, LAST_INDEX_TRINARY_OFFSET, LAST_INDEX_TRINARY_SIZE);
+		System.arraycopy(Converter.bytes(trits, BUNDLE_TRINARY_OFFSET, BUNDLE_TRINARY_SIZE), 0,
+				bundle = new byte[BUNDLE_SIZE], 0, BUNDLE_SIZE);
+		System.arraycopy(Converter.bytes(trits, TRUNK_TRANSACTION_TRINARY_OFFSET, TRUNK_TRANSACTION_TRINARY_SIZE), 0,
+				trunkTransaction = new byte[TRUNK_TRANSACTION_SIZE], 0, TRUNK_TRANSACTION_SIZE);
+		System.arraycopy(Converter.bytes(trits, BRANCH_TRANSACTION_TRINARY_OFFSET, BRANCH_TRANSACTION_TRINARY_SIZE), 0,
+				branchTransaction = new byte[BRANCH_TRANSACTION_SIZE], 0, BRANCH_TRANSACTION_SIZE);
 
-        type = mainBuffer[TYPE_OFFSET];
-        System.arraycopy(mainBuffer, HASH_OFFSET, hash = new byte[HASH_SIZE], 0, HASH_SIZE);
+		type = Storage.FILLED_SLOT;
 
-        System.arraycopy(mainBuffer, BYTES_OFFSET, bytes = new byte[BYTES_SIZE], 0, BYTES_SIZE);
+		trunkTransactionPointer = 0;
+		branchTransactionPointer = 0;
+		validity = 0;
 
-        System.arraycopy(mainBuffer, ADDRESS_OFFSET, address = new byte[ADDRESS_SIZE], 0, ADDRESS_SIZE);
-        value = AbstractStorage.value(mainBuffer, VALUE_OFFSET);
-        System.arraycopy(mainBuffer, TAG_OFFSET, tag = new byte[TAG_SIZE], 0, TAG_SIZE);
-        currentIndex = Storage.value(mainBuffer, CURRENT_INDEX_OFFSET);
-        lastIndex = Storage.value(mainBuffer, LAST_INDEX_OFFSET);
-        System.arraycopy(mainBuffer, BUNDLE_OFFSET, bundle = new byte[BUNDLE_SIZE], 0, BUNDLE_SIZE);
-        System.arraycopy(mainBuffer, TRUNK_TRANSACTION_OFFSET, trunkTransaction = new byte[TRUNK_TRANSACTION_SIZE], 0, TRUNK_TRANSACTION_SIZE);
-        System.arraycopy(mainBuffer, BRANCH_TRANSACTION_OFFSET, branchTransaction = new byte[BRANCH_TRANSACTION_SIZE], 0, BRANCH_TRANSACTION_SIZE);
+		pointer = 0;
+	}
 
-        trunkTransactionPointer = StorageTransactions.instance().transactionPointer(trunkTransaction);
-        if (trunkTransactionPointer < 0) {
-            trunkTransactionPointer = -trunkTransactionPointer;
-        }
-        branchTransactionPointer = StorageTransactions.instance().transactionPointer(branchTransaction);
-        if (branchTransactionPointer < 0) {
-            branchTransactionPointer = -branchTransactionPointer;
-        }
+	public Transaction(final byte[] mainBuffer, final long pointer) {
 
-        validity = mainBuffer[VALIDITY_OFFSET];
+		type = mainBuffer[TYPE_OFFSET];
+		System.arraycopy(mainBuffer, HASH_OFFSET, hash = new byte[HASH_SIZE], 0, HASH_SIZE);
 
-        this.pointer = pointer;
-    }
+		System.arraycopy(mainBuffer, BYTES_OFFSET, bytes = new byte[BYTES_SIZE], 0, BYTES_SIZE);
 
-    public synchronized int[] trits() {
+		System.arraycopy(mainBuffer, ADDRESS_OFFSET, address = new byte[ADDRESS_SIZE], 0, ADDRESS_SIZE);
+		value = AbstractStorage.value(mainBuffer, VALUE_OFFSET);
+		System.arraycopy(mainBuffer, TAG_OFFSET, tag = new byte[TAG_SIZE], 0, TAG_SIZE);
+		currentIndex = Storage.value(mainBuffer, CURRENT_INDEX_OFFSET);
+		lastIndex = Storage.value(mainBuffer, LAST_INDEX_OFFSET);
+		System.arraycopy(mainBuffer, BUNDLE_OFFSET, bundle = new byte[BUNDLE_SIZE], 0, BUNDLE_SIZE);
+		System.arraycopy(mainBuffer, TRUNK_TRANSACTION_OFFSET, trunkTransaction = new byte[TRUNK_TRANSACTION_SIZE], 0,
+				TRUNK_TRANSACTION_SIZE);
+		System.arraycopy(mainBuffer, BRANCH_TRANSACTION_OFFSET, branchTransaction = new byte[BRANCH_TRANSACTION_SIZE],
+				0, BRANCH_TRANSACTION_SIZE);
 
-        if (trits == null) {
-            trits = new int[TRINARY_SIZE];
-            Converter.getTrits(bytes, trits);
-        }
-        return trits;
-    }
+		trunkTransactionPointer = StorageTransactions.instance().transactionPointer(trunkTransaction);
+		if (trunkTransactionPointer < 0) {
+			trunkTransactionPointer = -trunkTransactionPointer;
+		}
+		branchTransactionPointer = StorageTransactions.instance().transactionPointer(branchTransaction);
+		if (branchTransactionPointer < 0) {
+			branchTransactionPointer = -branchTransactionPointer;
+		}
 
-    public static void dump(final byte[] mainBuffer, final byte[] hash, final Transaction transaction) {
+		validity = mainBuffer[VALIDITY_OFFSET];
 
-        System.arraycopy(new byte[AbstractStorage.CELL_SIZE], 0, mainBuffer, 0, AbstractStorage.CELL_SIZE);
-        System.arraycopy(hash, 0, mainBuffer, HASH_OFFSET, HASH_SIZE);
+		this.pointer = pointer;
+	}
 
-        if (transaction == null) {
-            mainBuffer[TYPE_OFFSET] = Storage.PREFILLED_SLOT;
-        } else {
-            mainBuffer[TYPE_OFFSET] = (byte)transaction.type;
+	public synchronized int[] trits() {
 
-            System.arraycopy(transaction.bytes, 0, mainBuffer, BYTES_OFFSET, BYTES_SIZE);
-            System.arraycopy(transaction.address, 0, mainBuffer, ADDRESS_OFFSET, ADDRESS_SIZE);
-            Storage.setValue(mainBuffer, VALUE_OFFSET, transaction.value);
-            final int[] trits = transaction.trits();
-            System.arraycopy(Converter.bytes(trits, TAG_TRINARY_OFFSET, TAG_TRINARY_SIZE), 0, mainBuffer, TAG_OFFSET, TAG_SIZE);
-            Storage.setValue(mainBuffer, CURRENT_INDEX_OFFSET, transaction.currentIndex);
-            Storage.setValue(mainBuffer, LAST_INDEX_OFFSET, transaction.lastIndex);
-            System.arraycopy(Converter.bytes(trits, BUNDLE_TRINARY_OFFSET, BUNDLE_TRINARY_SIZE), 0, mainBuffer, BUNDLE_OFFSET, BUNDLE_SIZE);
-            System.arraycopy(transaction.trunkTransaction, 0, mainBuffer, TRUNK_TRANSACTION_OFFSET, TRUNK_TRANSACTION_SIZE);
-            System.arraycopy(transaction.branchTransaction, 0, mainBuffer, BRANCH_TRANSACTION_OFFSET, BRANCH_TRANSACTION_SIZE);
+		if (trits == null) {
+			trits = new int[TRINARY_SIZE];
+			Converter.getTrits(bytes, trits);
+		}
+		return trits;
+	}
 
-            long approvedTransactionPointer = StorageTransactions.instance().transactionPointer(transaction.trunkTransaction);
-            if (approvedTransactionPointer == 0) {
-                Storage.approvedTransactionsToStore[Storage.numberOfApprovedTransactionsToStore++] = transaction.trunkTransaction;
-            } else {
+	public static void dump(final byte[] mainBuffer, final byte[] hash, final Transaction transaction) {
 
-                if (approvedTransactionPointer < 0) {
-                    approvedTransactionPointer = -approvedTransactionPointer;
-                }
-                final long index = (approvedTransactionPointer - (AbstractStorage.CELLS_OFFSET - AbstractStorage.SUPER_GROUPS_OFFSET)) >> 11;
-                StorageTransactions.instance().transactionsTipsFlags().put(
-                		(int)(index >> 3), 
-                		(byte)(StorageTransactions.instance().transactionsTipsFlags().get((int)(index >> 3)) & (0xFF ^ (1 << (index & 7)))));
-            }
-            if (!Arrays.equals(transaction.branchTransaction, transaction.trunkTransaction)) {
+		System.arraycopy(new byte[AbstractStorage.CELL_SIZE], 0, mainBuffer, 0, AbstractStorage.CELL_SIZE);
+		System.arraycopy(hash, 0, mainBuffer, HASH_OFFSET, HASH_SIZE);
 
-                approvedTransactionPointer = StorageTransactions.instance().transactionPointer(transaction.branchTransaction);
-                if (approvedTransactionPointer == 0) {
-                    Storage.approvedTransactionsToStore[Storage.numberOfApprovedTransactionsToStore++] = transaction.branchTransaction;
-                } else {
+		if (transaction == null) {
+			mainBuffer[TYPE_OFFSET] = Storage.PREFILLED_SLOT;
+		} else {
+			mainBuffer[TYPE_OFFSET] = (byte) transaction.type;
 
-                    if (approvedTransactionPointer < 0) {
-                        approvedTransactionPointer = -approvedTransactionPointer;
-                    }
-                    final long index = (approvedTransactionPointer - (Storage.CELLS_OFFSET - Storage.SUPER_GROUPS_OFFSET)) >> 11;
-                    StorageTransactions.instance().transactionsTipsFlags().put(
-                    		(int) (index >> 3), 
-                    		(byte) (StorageTransactions.instance().transactionsTipsFlags().get((int) (index >> 3)) & (0xFF ^ (1 << (index & 7)))));
-                }
-            }
-        }
-    }
-    
-    public long value() {
+			System.arraycopy(transaction.bytes, 0, mainBuffer, BYTES_OFFSET, BYTES_SIZE);
+			System.arraycopy(transaction.address, 0, mainBuffer, ADDRESS_OFFSET, ADDRESS_SIZE);
+			Storage.setValue(mainBuffer, VALUE_OFFSET, transaction.value);
+			final int[] trits = transaction.trits();
+			System.arraycopy(Converter.bytes(trits, TAG_TRINARY_OFFSET, TAG_TRINARY_SIZE), 0, mainBuffer, TAG_OFFSET,
+					TAG_SIZE);
+			Storage.setValue(mainBuffer, CURRENT_INDEX_OFFSET, transaction.currentIndex);
+			Storage.setValue(mainBuffer, LAST_INDEX_OFFSET, transaction.lastIndex);
+			System.arraycopy(Converter.bytes(trits, BUNDLE_TRINARY_OFFSET, BUNDLE_TRINARY_SIZE), 0, mainBuffer,
+					BUNDLE_OFFSET, BUNDLE_SIZE);
+			System.arraycopy(transaction.trunkTransaction, 0, mainBuffer, TRUNK_TRANSACTION_OFFSET,
+					TRUNK_TRANSACTION_SIZE);
+			System.arraycopy(transaction.branchTransaction, 0, mainBuffer, BRANCH_TRANSACTION_OFFSET,
+					BRANCH_TRANSACTION_SIZE);
+
+			long approvedTransactionPointer = StorageTransactions.instance()
+					.transactionPointer(transaction.trunkTransaction);
+			if (approvedTransactionPointer == 0) {
+				Storage.approvedTransactionsToStore[Storage.numberOfApprovedTransactionsToStore++] = transaction.trunkTransaction;
+			} else {
+
+				if (approvedTransactionPointer < 0) {
+					approvedTransactionPointer = -approvedTransactionPointer;
+				}
+				final long index = (approvedTransactionPointer
+						- (AbstractStorage.CELLS_OFFSET - AbstractStorage.SUPER_GROUPS_OFFSET)) >> 11;
+				StorageTransactions.instance().transactionsTipsFlags().put((int) (index >> 3),
+						(byte) (StorageTransactions.instance().transactionsTipsFlags().get((int) (index >> 3))
+								& (0xFF ^ (1 << (index & 7)))));
+			}
+			if (!Arrays.equals(transaction.branchTransaction, transaction.trunkTransaction)) {
+
+				approvedTransactionPointer = StorageTransactions.instance()
+						.transactionPointer(transaction.branchTransaction);
+				if (approvedTransactionPointer == 0) {
+					Storage.approvedTransactionsToStore[Storage.numberOfApprovedTransactionsToStore++] = transaction.branchTransaction;
+				} else {
+
+					if (approvedTransactionPointer < 0) {
+						approvedTransactionPointer = -approvedTransactionPointer;
+					}
+					final long index = (approvedTransactionPointer
+							- (Storage.CELLS_OFFSET - Storage.SUPER_GROUPS_OFFSET)) >> 11;
+					StorageTransactions.instance().transactionsTipsFlags().put((int) (index >> 3),
+							(byte) (StorageTransactions.instance().transactionsTipsFlags().get((int) (index >> 3))
+									& (0xFF ^ (1 << (index & 7)))));
+				}
+			}
+		}
+	}
+
+	public long value() {
 		return value;
 	}
-    
-    public int validity() {
+
+	public int validity() {
 		return validity;
 	}
 }
-

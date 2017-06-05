@@ -11,143 +11,164 @@ import java.util.Queue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.aidos.ari.Milestone;
+import com.aidos.ari.conf.Configuration;
+import com.aidos.ari.conf.Configuration.DefaultConfSettings;
 import com.aidos.ari.model.Hash;
 import com.aidos.ari.model.Transaction;
 
 public class StorageScratchpad extends AbstractStorage {
 
-    private static final Logger log = LoggerFactory.getLogger(StorageScratchpad.class);
+	private static final Logger log = LoggerFactory.getLogger(StorageScratchpad.class);
 
-    private static final StorageScratchpad instance = new StorageScratchpad();
-    private static final String SCRATCHPAD_FILE_NAME = "scratchpad.store";
+	private static final StorageScratchpad instance = new StorageScratchpad();
+	private static final String SCRATCHPAD_FILE_NAME = Configuration.booling(DefaultConfSettings.TESTNET)
+			? "scratchpad.store.testnet" : "scratchpad.store";
 
-    private ByteBuffer transactionsToRequest;
-    private ByteBuffer analyzedTransactionsFlags, analyzedTransactionsFlagsCopy;
-    
-    private final byte[] transactionToRequest = new byte[Transaction.HASH_SIZE];
-    private final Object transactionToRequestMonitor = new Object();
-    private int previousNumberOfTransactions;
+	private ByteBuffer transactionsToRequest;
+	private ByteBuffer analyzedTransactionsFlags, analyzedTransactionsFlagsCopy;
 
-    public volatile int numberOfTransactionsToRequest;
+	private final byte[] transactionToRequest = new byte[Transaction.HASH_SIZE];
+	private final Object transactionToRequestMonitor = new Object();
+	private int previousNumberOfTransactions;
 
-    private FileChannel scratchpadChannel = null;
+	public volatile int numberOfTransactionsToRequest;
 
-    @Override
-    public void init() throws IOException {
-        scratchpadChannel = FileChannel.open(Paths.get(SCRATCHPAD_FILE_NAME), StandardOpenOption.CREATE, StandardOpenOption.READ, StandardOpenOption.WRITE);
-        transactionsToRequest = scratchpadChannel.map(FileChannel.MapMode.READ_WRITE, TRANSACTIONS_TO_REQUEST_OFFSET, TRANSACTIONS_TO_REQUEST_SIZE);
-        analyzedTransactionsFlags = scratchpadChannel.map(FileChannel.MapMode.READ_WRITE, ANALYZED_TRANSACTIONS_FLAGS_OFFSET, ANALYZED_TRANSACTIONS_FLAGS_SIZE);
-        analyzedTransactionsFlagsCopy = scratchpadChannel.map(FileChannel.MapMode.READ_WRITE, ANALYZED_TRANSACTIONS_FLAGS_COPY_OFFSET, ANALYZED_TRANSACTIONS_FLAGS_COPY_SIZE);	
-    }
+	private FileChannel scratchpadChannel = null;
 
-    @Override
-    public void shutdown() {
-        try {
-            scratchpadChannel.close();	
-        } catch (final Exception e) {
-            log.error("Shutting down Storage Scratchpad error: ", e);
-        }
+	@Override
+	public void init() throws IOException {
+		scratchpadChannel = FileChannel.open(Paths.get(SCRATCHPAD_FILE_NAME), StandardOpenOption.CREATE,
+				StandardOpenOption.READ, StandardOpenOption.WRITE);
+		transactionsToRequest = scratchpadChannel.map(FileChannel.MapMode.READ_WRITE, TRANSACTIONS_TO_REQUEST_OFFSET,
+				TRANSACTIONS_TO_REQUEST_SIZE);
+		analyzedTransactionsFlags = scratchpadChannel.map(FileChannel.MapMode.READ_WRITE,
+				ANALYZED_TRANSACTIONS_FLAGS_OFFSET, ANALYZED_TRANSACTIONS_FLAGS_SIZE);
+		analyzedTransactionsFlagsCopy = scratchpadChannel.map(FileChannel.MapMode.READ_WRITE,
+				ANALYZED_TRANSACTIONS_FLAGS_COPY_OFFSET, ANALYZED_TRANSACTIONS_FLAGS_COPY_SIZE);
 	}
-	
+
+	@Override
+	public void shutdown() {
+		try {
+			scratchpadChannel.close();
+		} catch (final Exception e) {
+			log.error("Shutting down Storage Scratchpad error: ", e);
+		}
+	}
+
 	public void transactionToRequest(final byte[] buffer, final int offset) {
 
-        synchronized (transactionToRequestMonitor) {
+		synchronized (transactionToRequestMonitor) {
 
-            if (numberOfTransactionsToRequest == 0) {
+			if (numberOfTransactionsToRequest == 0) {
 
-                final long beginningTime = System.currentTimeMillis();
+				final long beginningTime = System.currentTimeMillis();
 
-                synchronized (analyzedTransactionsFlags) {
+				synchronized (analyzedTransactionsFlags) {
 
-                    clearAnalyzedTransactionsFlags();
+					clearAnalyzedTransactionsFlags();
 
-                    final Queue<Long> nonAnalyzedTransactions = new LinkedList<>(
-                    		
-                    Collections.singleton(
-                        StorageTransactions.instance()
-                        .transactionPointer(Milestone.latestMilestone.bytes())));
-                    
-                    Long pointer;
-                    while ((pointer = nonAnalyzedTransactions.poll()) != null) {
+					final Queue<Long> nonAnalyzedTransactions = new LinkedList<>(
 
-                        if (setAnalyzedTransactionFlag(pointer)) {
+							Collections.singleton(StorageTransactions.instance()
+									.transactionPointer(Milestone.latestMilestone.bytes())));
 
-                            final Transaction transaction = StorageTransactions.instance().loadTransaction(pointer);
-                            if (transaction.type == Storage.PREFILLED_SLOT) {
+					Long pointer;
+					while ((pointer = nonAnalyzedTransactions.poll()) != null) {
 
-                                ((ByteBuffer) transactionsToRequest.position(numberOfTransactionsToRequest++ * Transaction.HASH_SIZE)).put(transaction.hash); // Only 2'917'776 hashes can be stored this way without overflowing the buffer, we assume that nodes will never need to store that many hashes, so we don't need to cap "numberOfTransactionsToRequest"
-                            } else {
-                                nonAnalyzedTransactions.offer(transaction.trunkTransactionPointer);
-                                nonAnalyzedTransactions.offer(transaction.branchTransactionPointer);
-                            }
-                        }
-                    }
-                }
+						if (setAnalyzedTransactionFlag(pointer)) {
 
-                final long transactionsNextPointer = StorageTransactions.transactionsNextPointer;
-                log.info("Transactions to request = {}", numberOfTransactionsToRequest + " / " + (transactionsNextPointer - (CELLS_OFFSET - SUPER_GROUPS_OFFSET)) / CELL_SIZE + " (" + (System.currentTimeMillis() - beginningTime) + " ms / " + (numberOfTransactionsToRequest == 0 ? 0 : (previousNumberOfTransactions == 0 ? 0 : (((transactionsNextPointer - (CELLS_OFFSET - SUPER_GROUPS_OFFSET)) / CELL_SIZE - previousNumberOfTransactions) * 100) / numberOfTransactionsToRequest)) + "%)");
-                previousNumberOfTransactions = (int) ((transactionsNextPointer - (CELLS_OFFSET - SUPER_GROUPS_OFFSET)) / CELL_SIZE);
-            }
+							final Transaction transaction = StorageTransactions.instance().loadTransaction(pointer);
+							if (transaction.type == Storage.PREFILLED_SLOT) {
 
-            if (numberOfTransactionsToRequest == 0) {
-                System.arraycopy(Hash.NULL_HASH.bytes(), 0, buffer, offset, Transaction.HASH_SIZE);
-            } else {
-                ((ByteBuffer) transactionsToRequest.position(--numberOfTransactionsToRequest * Transaction.HASH_SIZE)).get(transactionToRequest);
-                System.arraycopy(transactionToRequest, 0, buffer, offset, Transaction.HASH_SIZE);
-            }
-        }
-    }
+								((ByteBuffer) transactionsToRequest
+										.position(numberOfTransactionsToRequest++ * Transaction.HASH_SIZE))
+												.put(transaction.hash); // Only 2'917'776 hashes can be stored this way
+																		// without overflowing the buffer, we assume
+																		// that nodes will never need to store that many
+																		// hashes, so we don't need to cap
+																		// "numberOfTransactionsToRequest"
+							} else {
+								nonAnalyzedTransactions.offer(transaction.trunkTransactionPointer);
+								nonAnalyzedTransactions.offer(transaction.branchTransactionPointer);
+							}
+						}
+					}
+				}
 
-    public void clearAnalyzedTransactionsFlags() {
-        analyzedTransactionsFlags.position(0);
-        for (int i = 0; i < ANALYZED_TRANSACTIONS_FLAGS_SIZE / CELL_SIZE; i++) {
-            analyzedTransactionsFlags.put(ZEROED_BUFFER);
-        }
-    }
+				final long transactionsNextPointer = StorageTransactions.transactionsNextPointer;
+				log.info("Transactions to request = {}", numberOfTransactionsToRequest + " / "
+						+ (transactionsNextPointer - (CELLS_OFFSET - SUPER_GROUPS_OFFSET)) / CELL_SIZE + " ("
+						+ (System.currentTimeMillis() - beginningTime) + " ms / "
+						+ (numberOfTransactionsToRequest == 0 ? 0
+								: (previousNumberOfTransactions == 0 ? 0
+										: (((transactionsNextPointer - (CELLS_OFFSET - SUPER_GROUPS_OFFSET)) / CELL_SIZE
+												- previousNumberOfTransactions) * 100) / numberOfTransactionsToRequest))
+						+ "%)");
+				previousNumberOfTransactions = (int) ((transactionsNextPointer - (CELLS_OFFSET - SUPER_GROUPS_OFFSET))
+						/ CELL_SIZE);
+			}
 
-    public boolean analyzedTransactionFlag(long pointer) {
-        pointer -= CELLS_OFFSET - SUPER_GROUPS_OFFSET;
-        return (analyzedTransactionsFlags.get((int) (pointer >> (11 + 3))) & (1 << ((pointer >> 11) & 7))) != 0;
-    }
+			if (numberOfTransactionsToRequest == 0) {
+				System.arraycopy(Hash.NULL_HASH.bytes(), 0, buffer, offset, Transaction.HASH_SIZE);
+			} else {
+				((ByteBuffer) transactionsToRequest.position(--numberOfTransactionsToRequest * Transaction.HASH_SIZE))
+						.get(transactionToRequest);
+				System.arraycopy(transactionToRequest, 0, buffer, offset, Transaction.HASH_SIZE);
+			}
+		}
+	}
 
-    public boolean setAnalyzedTransactionFlag(long pointer) {
+	public void clearAnalyzedTransactionsFlags() {
+		analyzedTransactionsFlags.position(0);
+		for (int i = 0; i < ANALYZED_TRANSACTIONS_FLAGS_SIZE / CELL_SIZE; i++) {
+			analyzedTransactionsFlags.put(ZEROED_BUFFER);
+		}
+	}
 
-        pointer -= CELLS_OFFSET - SUPER_GROUPS_OFFSET;
+	public boolean analyzedTransactionFlag(long pointer) {
+		pointer -= CELLS_OFFSET - SUPER_GROUPS_OFFSET;
+		return (analyzedTransactionsFlags.get((int) (pointer >> (11 + 3))) & (1 << ((pointer >> 11) & 7))) != 0;
+	}
 
-        final int value = analyzedTransactionsFlags.get((int) (pointer >> (11 + 3)));
-        if ((value & (1 << ((pointer >> 11) & 7))) == 0) {
-            analyzedTransactionsFlags.put((int)(pointer >> (11 + 3)), (byte)(value | (1 << ((pointer >> 11) & 7))));
-            return true;
-        } 
-        return false;
-    }
+	public boolean setAnalyzedTransactionFlag(long pointer) {
 
-    public void saveAnalyzedTransactionsFlags() {
-        analyzedTransactionsFlags.position(0);
-        analyzedTransactionsFlagsCopy.position(0);
-        analyzedTransactionsFlagsCopy.put(analyzedTransactionsFlags);
-    }
+		pointer -= CELLS_OFFSET - SUPER_GROUPS_OFFSET;
 
-    public void loadAnalyzedTransactionsFlags() {
-        analyzedTransactionsFlagsCopy.position(0);
-        analyzedTransactionsFlags.position(0);
-        analyzedTransactionsFlags.put(analyzedTransactionsFlagsCopy);
-    }
-    
-    public ByteBuffer getAnalyzedTransactionsFlags() {
+		final int value = analyzedTransactionsFlags.get((int) (pointer >> (11 + 3)));
+		if ((value & (1 << ((pointer >> 11) & 7))) == 0) {
+			analyzedTransactionsFlags.put((int) (pointer >> (11 + 3)), (byte) (value | (1 << ((pointer >> 11) & 7))));
+			return true;
+		}
+		return false;
+	}
+
+	public void saveAnalyzedTransactionsFlags() {
+		analyzedTransactionsFlags.position(0);
+		analyzedTransactionsFlagsCopy.position(0);
+		analyzedTransactionsFlagsCopy.put(analyzedTransactionsFlags);
+	}
+
+	public void loadAnalyzedTransactionsFlags() {
+		analyzedTransactionsFlagsCopy.position(0);
+		analyzedTransactionsFlags.position(0);
+		analyzedTransactionsFlags.put(analyzedTransactionsFlagsCopy);
+	}
+
+	public ByteBuffer getAnalyzedTransactionsFlags() {
 		return analyzedTransactionsFlags;
 	}
-    
-    public ByteBuffer getAnalyzedTransactionsFlagsCopy() {
+
+	public ByteBuffer getAnalyzedTransactionsFlagsCopy() {
 		return analyzedTransactionsFlagsCopy;
 	}
-    
-    public int getNumberOfTransactionsToRequest() {
+
+	public int getNumberOfTransactionsToRequest() {
 		return numberOfTransactionsToRequest;
 	}
 
 	public static StorageScratchpad instance() {
 		return instance;
 	}
-	
+
 }
