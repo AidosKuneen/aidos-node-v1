@@ -137,7 +137,7 @@ public class PD {
 							// This shouldn't happen to be true anymore except its the initial node
 							if (!dns.getAddress().getAddress().getHostAddress().equals(ip)) {
 								connect = true;
-								Peers peer = new Peers(dns.getAddress(), dns.getType());
+								Peers peer = new Peers(new InetSocketAddress(dns.getAddress().getAddress().getHostAddress(), defaultMeshPort), dns.getType());
 								Node.instance().addPeer(peer);
 								log.debug("Adding {} to Node Peers. Success: {}",
 										peer.getAddress().getAddress().getHostAddress(),
