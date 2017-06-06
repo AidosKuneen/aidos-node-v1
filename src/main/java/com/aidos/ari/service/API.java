@@ -67,6 +67,9 @@ import io.undertow.server.HttpServerExchange;
 import io.undertow.util.HeaderMap;
 import io.undertow.util.Headers;
 import io.undertow.util.HttpString;
+import io.undertow.util.Methods;
+import io.undertow.util.MimeMappings;
+import io.undertow.util.StatusCodes;
 
 @SuppressWarnings("unchecked")
 public class API {
@@ -92,16 +95,31 @@ public class API {
 	private final AtomicInteger counter = new AtomicInteger(0);
 
 	public void init() throws IOException {
-
 		final int apiPort = Configuration.integer(DefaultConfSettings.API_PORT);
 		final String apiHost = Configuration.string(DefaultConfSettings.API_HOST);
 
-		log.info("Binding JSON-REST API Undertown server on {}:{}", apiHost, apiPort);
+		log.debug("Binding JSON-REST API Undertown server on {}:{}", apiHost, apiPort);
 
 		server = Undertow.builder().addHttpListener(apiPort, apiHost)
 				.setHandler(path().addPrefixPath("/", new HttpHandler() {
 					@Override
 					public void handleRequest(final HttpServerExchange exchange) throws Exception {
+						HttpString requestMethod = exchange.getRequestMethod();
+						if (Methods.OPTIONS.equals(requestMethod)) {
+							String allowedMethods = "GET,HEAD,POST,PUT,DELETE,TRACE,OPTIONS,CONNECT,PATCH";
+							// return list of allowed methods in response headers
+							exchange.setStatusCode(StatusCodes.OK);
+							exchange.getResponseHeaders().put(Headers.CONTENT_TYPE,
+									MimeMappings.DEFAULT_MIME_MAPPINGS.get("txt"));
+							exchange.getResponseHeaders().put(Headers.CONTENT_LENGTH, 0);
+							exchange.getResponseHeaders().put(Headers.ALLOW, allowedMethods);
+							exchange.getResponseHeaders().put(new HttpString("Access-Control-Allow-Origin"), "*");
+							exchange.getResponseHeaders().put(new HttpString("Access-Control-Allow-Headers"),
+									"Origin, X-Requested-With, Content-Type, Accept");
+							exchange.getResponseSender().close();
+							return;
+						}
+
 						if (exchange.isInIoThread()) {
 							exchange.dispatch(this);
 							return;
@@ -553,7 +571,6 @@ public class API {
 		return GetBalancesResponse.create(elements, milestone, milestoneIndex);
 	}
 
-	
 	private static int counter_PoW = 0;
 
 	public static int getCounter_PoW() {
@@ -574,8 +591,8 @@ public class API {
 		ellapsedTime_PoW += ellapsedTime;
 	}
 
-	public synchronized AbstractResponse attachToMeshStatement(final Hash trunkTransaction, final Hash branchTransaction,
-			final int minWeightMagnitude, final List<String> trytes) {
+	public synchronized AbstractResponse attachToMeshStatement(final Hash trunkTransaction,
+			final Hash branchTransaction, final int minWeightMagnitude, final List<String> trytes) {
 		final List<Transaction> transactions = new LinkedList<>();
 
 		Hash prevTransaction = null;
