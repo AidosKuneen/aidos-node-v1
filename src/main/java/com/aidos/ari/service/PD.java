@@ -5,10 +5,13 @@ import com.aidos.ari.conf.Configuration;
 import com.aidos.ari.conf.Configuration.DefaultConfSettings;
 import com.aidos.ari.conf.ipType;
 import com.jayway.jsonpath.*;
+
+import java.io.BufferedInputStream;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.Inet4Address;
@@ -479,11 +482,12 @@ public class PD {
 	// Returns only "ip" if it returns the expected JSON
 	private Optional<String> isPeerRunning(InetSocketAddress address) {
 		// Checks peer online status via API ping command
+		HttpURLConnection http = null;
 		try {
 			String urlString = getHostURL(address);
 			URL url = new URL("http://" + urlString);
 			URLConnection con = url.openConnection();
-			HttpURLConnection http = (HttpURLConnection) con;
+			http = (HttpURLConnection) con;
 			http.setRequestMethod("POST");
 			http.setDoOutput(true);
 			byte[] out = "{\"command\": \"ping\"}".getBytes(StandardCharsets.UTF_8);
@@ -497,16 +501,11 @@ public class PD {
 			try (OutputStream os = http.getOutputStream()) {
 				os.write(out);
 			}
-			ByteArrayOutputStream result = new ByteArrayOutputStream();
-			byte[] buffer = new byte[1024];
-			int length2;
-			while ((length2 = http.getInputStream().read(buffer)) != -1) {
-				result.write(buffer, 0, length2);
-			}
-			// StandardCharsets.UTF_8.name() > JDK 7
-			http.getInputStream().close();
 			// Json
-			String json = result.toString(StandardCharsets.UTF_8.name());
+			String json;
+			try (InputStream in = new BufferedInputStream(http.getInputStream())) {
+				json = org.apache.commons.io.IOUtils.toString(in, StandardCharsets.UTF_8.name());
+			}
 			String ip = JsonPath.parse(json).read("$.ip");
 
 			return Optional.of(ip);
@@ -518,6 +517,10 @@ public class PD {
 			log.warn("JSON Path failure.");
 		} catch (IOException e) {
 			log.debug("Can't connect to API on address: {}", address.getAddress().getHostAddress());
+		} finally {
+			if (http != null) {
+				http.disconnect();
+			}
 		}
 		return Optional.empty();
 	}
@@ -525,11 +528,12 @@ public class PD {
 	// Get Peerlist from a node
 	private Map<InetSocketAddress, ipType> getPeersAndType(InetSocketAddress remote) {
 		Map<InetSocketAddress, ipType> addresses = new HashMap<InetSocketAddress, ipType>();
+		HttpURLConnection http = null;
 		try {
 			String urlString = getHostURL(remote);
 			URL url = new URL("http://" + urlString);
 			URLConnection con = url.openConnection();
-			HttpURLConnection http = (HttpURLConnection) con;
+			http = (HttpURLConnection) con;
 			http.setRequestMethod("POST");
 			http.setDoOutput(true);
 
@@ -539,21 +543,18 @@ public class PD {
 			http.setFixedLengthStreamingMode(length);
 			http.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
 			// Here if connection refused
+			http.setReadTimeout(Configuration.CONNECTION_TIMEOUT);
 			http.connect();
 
 			try (OutputStream os = http.getOutputStream()) {
 				os.write(out);
 			}
-			ByteArrayOutputStream result = new ByteArrayOutputStream();
-			byte[] buffer = new byte[1024];
-			int length2;
-			while ((length2 = http.getInputStream().read(buffer)) != -1) {
-				result.write(buffer, 0, length2);
+
+			// Read Json
+			String json;
+			try (InputStream in = new BufferedInputStream(http.getInputStream())) {
+				json = org.apache.commons.io.IOUtils.toString(in, StandardCharsets.UTF_8.name());
 			}
-			// StandardCharsets.UTF_8.name() > JDK 7
-			http.getInputStream().close();
-			// Json
-			String json = result.toString(StandardCharsets.UTF_8.name());
 			List<String> peerlist = JsonPath.parse(json).read("$.peerlist");
 
 			for (String p : peerlist) {
@@ -564,17 +565,22 @@ public class PD {
 			}
 		} catch (IOException e) {
 			log.debug("Can't connect to API on address: {}", remote.getAddress().getHostAddress());
+		} finally {
+			if (http != null) {
+				http.disconnect();
+			}
 		}
 		return addresses;
 	}
 
 	// 0 already added, 1 added, -1 maxed not added.
 	private Integer pushPeer(InetSocketAddress remote, InetSocketAddress local) {
+		HttpURLConnection http = null;
 		try {
 			String urlString = getHostURL(remote);
 			URL url = new URL("http://" + urlString);
 			URLConnection con = url.openConnection();
-			HttpURLConnection http = (HttpURLConnection) con;
+			http = (HttpURLConnection) con;
 			http.setRequestMethod("POST");
 			http.setDoOutput(true);
 
@@ -587,19 +593,12 @@ public class PD {
 			// Here if connection refused
 			http.connect();
 
-			try (OutputStream os = http.getOutputStream()) {
-				os.write(out);
+			// Read Json
+			String json;
+			try (InputStream in = new BufferedInputStream(http.getInputStream())) {
+				json = org.apache.commons.io.IOUtils.toString(in, StandardCharsets.UTF_8.name());
 			}
-			ByteArrayOutputStream result = new ByteArrayOutputStream();
-			byte[] buffer = new byte[1024];
-			int length2;
-			while ((length2 = http.getInputStream().read(buffer)) != -1) {
-				result.write(buffer, 0, length2);
-			}
-			// StandardCharsets.UTF_8.name() > JDK 7
-			http.getInputStream().close();
-			// Json
-			String json = result.toString(StandardCharsets.UTF_8.name());
+
 			Integer addedPeer = JsonPath.parse(json).read("$.addedPeer");
 			// 0 already added, 1 added, -1 maxed not added.
 			return addedPeer;
@@ -607,6 +606,10 @@ public class PD {
 			log.debug("Failure pushing Peer address to: {} {}", remote.getAddress().getHostAddress(), e.getMessage());
 			// in case of an error, treat as not added.
 			return -1;
+		} finally {
+			if (http != null) {
+				http.disconnect();
+			}
 		}
 	}
 
