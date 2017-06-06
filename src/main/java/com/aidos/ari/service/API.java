@@ -74,7 +74,7 @@ public class API {
 	private static final Logger log = LoggerFactory.getLogger(API.class);
 
 	// Max amount of peers that a node will accept.
-	private static final int MAX_PEERS = 14;
+	private static final int MAX_PEERS = 5;
 
 	private final static int HASH_SIZE = 81;
 	private final static int TRYTES_SIZE = 2673;

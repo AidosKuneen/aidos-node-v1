@@ -55,7 +55,7 @@ public class PD {
 	private static final String PD_FILE = "peerlist.store.testnet";
 
 	// Number of nodes that should be added as peers
-	private static final int PEERS_TO_FIND = 6;
+	private static final int PEERS_TO_FIND = 3;
 
 	// Empty string for "false", or local ip in ipv4/6
 	private static Map<ipType, String> ipMode = new HashMap<ipType, String>();
