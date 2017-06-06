@@ -5,11 +5,9 @@ import com.aidos.ari.conf.Configuration;
 import com.aidos.ari.conf.Configuration.DefaultConfSettings;
 import com.aidos.ari.conf.ipType;
 import com.jayway.jsonpath.*;
-
 import java.io.BufferedInputStream;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -496,6 +494,7 @@ public class PD {
 			http.setFixedLengthStreamingMode(length);
 			http.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
 			// Here if connection refused
+			http.setReadTimeout(Configuration.CONNECTION_TIMEOUT);
 			http.connect();
 
 			try (OutputStream os = http.getOutputStream()) {
@@ -591,6 +590,7 @@ public class PD {
 			http.setFixedLengthStreamingMode(length);
 			http.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
 			// Here if connection refused
+			http.setReadTimeout(Configuration.CONNECTION_TIMEOUT);
 			http.connect();
 
 			// Read Json
