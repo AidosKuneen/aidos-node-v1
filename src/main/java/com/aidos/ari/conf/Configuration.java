@@ -16,7 +16,7 @@ public class Configuration {
 		REMOTEAPI, REMOTEWALLET, DEBUG, EXPERIMENTAL, TESTNET // experimental features.
 	}
 
-	public static final int CONNECTION_TIMEOUT = 2000; // in ms
+	public static final int CONNECTION_TIMEOUT = 3000; // in ms
 
 	static {
 		// defaults
