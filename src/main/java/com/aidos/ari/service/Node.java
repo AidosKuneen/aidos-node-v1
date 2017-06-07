@@ -178,7 +178,6 @@ public class Node {
 					}
 				} catch (final Exception e) {
 					log.error("Receiver Thread Exception:", e);
-
 				}
 			}
 			log.info("Shutting down spawning Receiver Thread");
