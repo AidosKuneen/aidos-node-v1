@@ -592,7 +592,11 @@ public class PD {
 			http.setReadTimeout(Configuration.CONNECTION_TIMEOUT);
 			// Here if connection refused
 			http.connect();
-
+			
+			try (OutputStream os = http.getOutputStream()) {
+				os.write(out);
+				os.flush();
+			}
 			// Read Json
 			String json;
 			InputStream in = new BufferedInputStream(http.getInputStream());
