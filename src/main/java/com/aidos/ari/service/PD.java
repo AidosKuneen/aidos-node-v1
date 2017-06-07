@@ -56,7 +56,7 @@ public class PD {
 	private static final String PD_FILE = "peerlist.store.testnet";
 
 	// Number of nodes that should be added as peers
-	private static final int PEERS_TO_FIND = 6;
+	private static final int PEERS_TO_FIND = 4;
 
 	// Empty string for "false", or local ip in ipv4/6
 	private static Map<ipType, String> ipMode = new HashMap<ipType, String>();
@@ -425,8 +425,9 @@ public class PD {
 										}
 										if (!peersIterate.contains(new Peers(a, searchList.get(a)))
 												&& !a.equals(tempLocal2)) {
-											// For mixed nodes don't add mixed peers from ipv4, but can still search
-											// them.
+											// For mixed nodes don't add mixed peers from ipv4 and also don't search
+											// them since this will make it so the same mixed node gets searched twice
+											// with his ipv4 and ipv6 address
 											if (a.getAddress() != null && compatibleIpTypesForSearch(
 													startSearch.getType(), searchList.get(a))) {
 												InetSocketAddress aAPI = new InetSocketAddress(
@@ -446,8 +447,6 @@ public class PD {
 												}
 												// Even if the peer fails to be added, still search his peers.
 												peersIterate.add(new Peers(a, searchList.get(a)));
-												// Could only cause unnecessary overwrite
-												// peerSearch.put(a, false);
 											}
 										}
 									}
@@ -592,7 +591,7 @@ public class PD {
 			http.setReadTimeout(Configuration.CONNECTION_TIMEOUT);
 			// Here if connection refused
 			http.connect();
-			
+
 			try (OutputStream os = http.getOutputStream()) {
 				os.write(out);
 				os.flush();
