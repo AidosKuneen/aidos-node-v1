@@ -493,25 +493,23 @@ public class PD {
 
 			http.setFixedLengthStreamingMode(length);
 			http.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
-			// Here if connection refused
+			http.setConnectTimeout(Configuration.CONNECTION_TIMEOUT);
 			http.setReadTimeout(Configuration.CONNECTION_TIMEOUT);
+			// Here if connection refused
 			http.connect();
 
 			try (OutputStream os = http.getOutputStream()) {
 				os.write(out);
+				os.flush();
 			}
 			// Json
 			String json;
-			try (InputStream in = new BufferedInputStream(http.getInputStream())) {
-				json = org.apache.commons.io.IOUtils.toString(in, StandardCharsets.UTF_8.name());
-			}
+			InputStream in = new BufferedInputStream(http.getInputStream());
+			json = org.apache.commons.io.IOUtils.toString(in, StandardCharsets.UTF_8.name());
+			// Closing the inputStream will cause a undertow connection reset by peer on the opposing API
 			String ip = JsonPath.parse(json).read("$.ip");
 
 			return Optional.of(ip);
-			// if (result.toString(StandardCharsets.UTF_8.name()).matches("\\{\"duration\":[\\d]+\\}")) {
-			// return true;
-			// }
-			// receive answer duration:x then online, if not offline. could also return round time = ping.
 		} catch (PathNotFoundException e) {
 			log.warn("JSON Path failure.");
 		} catch (IOException e) {
@@ -541,19 +539,20 @@ public class PD {
 
 			http.setFixedLengthStreamingMode(length);
 			http.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
-			// Here if connection refused
+			http.setConnectTimeout(Configuration.CONNECTION_TIMEOUT);
 			http.setReadTimeout(Configuration.CONNECTION_TIMEOUT);
+			// Here if connection refused
 			http.connect();
 
 			try (OutputStream os = http.getOutputStream()) {
 				os.write(out);
+				os.flush();
 			}
-
 			// Read Json
 			String json;
-			try (InputStream in = new BufferedInputStream(http.getInputStream())) {
-				json = org.apache.commons.io.IOUtils.toString(in, StandardCharsets.UTF_8.name());
-			}
+			InputStream in = new BufferedInputStream(http.getInputStream());
+			json = org.apache.commons.io.IOUtils.toString(in, StandardCharsets.UTF_8.name());
+			// Closing the inputStream will cause a undertow connection reset by peer on the opposing API
 			List<String> peerlist = JsonPath.parse(json).read("$.peerlist");
 
 			for (String p : peerlist) {
@@ -589,15 +588,16 @@ public class PD {
 
 			http.setFixedLengthStreamingMode(length);
 			http.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
-			// Here if connection refused
+			http.setConnectTimeout(Configuration.CONNECTION_TIMEOUT);
 			http.setReadTimeout(Configuration.CONNECTION_TIMEOUT);
+			// Here if connection refused
 			http.connect();
 
 			// Read Json
 			String json;
-			try (InputStream in = new BufferedInputStream(http.getInputStream())) {
-				json = org.apache.commons.io.IOUtils.toString(in, StandardCharsets.UTF_8.name());
-			}
+			InputStream in = new BufferedInputStream(http.getInputStream());
+			json = org.apache.commons.io.IOUtils.toString(in, StandardCharsets.UTF_8.name());
+			// Closing the inputStream will cause a undertow connection reset by peer on the opposing API
 
 			Integer addedPeer = JsonPath.parse(json).read("$.addedPeer");
 			// 0 already added, 1 added, -1 maxed not added.
