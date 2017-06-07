@@ -20,7 +20,7 @@ public class Peers {
 	private int numberOfAllTransactions;
 	private int numberOfNewTransactions;
 	private int numberOfInvalidTransactions;
-	private ExecutorService exec = Executors.newFixedThreadPool(10);
+	private ExecutorService exec = Executors.newFixedThreadPool(6);
 
 //	public Peers(final InetSocketAddress address) {
 //		this.address = address;
