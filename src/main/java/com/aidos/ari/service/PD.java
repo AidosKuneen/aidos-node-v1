@@ -5,10 +5,11 @@ import com.aidos.ari.conf.Configuration;
 import com.aidos.ari.conf.Configuration.DefaultConfSettings;
 import com.aidos.ari.conf.ipType;
 import com.jayway.jsonpath.*;
+import java.io.BufferedInputStream;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.Inet4Address;
@@ -53,8 +54,6 @@ public class PD {
 	private static final PD instance = new PD();
 
 	private static final String PD_FILE = "peerlist.store";
-
-	private static final int CONNECTION_TIMEOUT = 2000; // in ms
 
 	// Number of nodes that should be added as peers
 	private static final int PEERS_TO_FIND = 6;
@@ -136,7 +135,10 @@ public class PD {
 							// This shouldn't happen to be true anymore except its the initial node
 							if (!dns.getAddress().getAddress().getHostAddress().equals(ip)) {
 								connect = true;
-								Peers peer = new Peers(dns.getAddress(), dns.getType());
+								Peers peer = new Peers(
+										new InetSocketAddress(dns.getAddress().getAddress().getHostAddress(),
+												defaultMeshPort),
+										dns.getType());
 								Node.instance().addPeer(peer);
 								log.debug("Adding {} to Node Peers. Success: {}",
 										peer.getAddress().getAddress().getHostAddress(),
@@ -195,8 +197,8 @@ public class PD {
 					// ipv4.
 					Collections.shuffle(Arrays.asList(address));
 					for (InetAddress a : address) {
-						if (a instanceof Inet4Address && PD.instance.getIpMode() != ipType.ipv6
-								&& PD.instance.getIpMode() != ipType.mixed) {
+						if (a instanceof Inet4Address && PD.instance().getIpMode() != ipType.ipv6
+								&& PD.instance().getIpMode() != ipType.mixed) {
 							result = new InetSocketAddress((Inet4Address) a, srv.getPort());
 							api = new InetSocketAddress((Inet4Address) a, defaultAPIport);
 							if (isPeerOnline(api)) {
@@ -326,7 +328,8 @@ public class PD {
 										tempLocal = new InetSocketAddress(ipMode.get(ipType.ipv4), defaultMeshPort);
 									}
 									int pushStatus = pushPeer(
-											new InetSocketAddress(peer.getAddress().getAddress(), defaultAPIport),
+											new InetSocketAddress(peer.getAddress().getAddress().getHostAddress(),
+													defaultAPIport),
 											tempLocal);
 									if (pushStatus >= 0) {
 										log.debug("Push peer: {} Status: {}",
@@ -338,7 +341,7 @@ public class PD {
 									// Add to search this peers peers anyway
 									peersIterate.add(peer);
 									// No double-entries because DC is not cleared
-									if (!peersIterateDC.contains(peer.getAddress())) {
+									if (!peersIterateDC.contains(peer)) {
 										peersIterateDC.add(peer);
 									}
 								}
@@ -346,8 +349,8 @@ public class PD {
 						}
 						statusExecutor.shutdown();
 						// Give 1 sec buffer
-						if (!statusExecutor.awaitTermination(PD.instance().getTimeoutValue() + 1, TimeUnit.SECONDS)) {
-							log.warn("Threads didn't finish in {} msec.", PD.instance().getTimeoutValue() + 1);
+						if (!statusExecutor.awaitTermination(Configuration.CONNECTION_TIMEOUT + 1, TimeUnit.SECONDS)) {
+							log.warn("Threads didn't finish in {} msec.", Configuration.CONNECTION_TIMEOUT + 1);
 						}
 					} else {
 						// After node completely disconnected from net it loses all its peers.
@@ -365,7 +368,8 @@ public class PD {
 											tempLocal = new InetSocketAddress(ipMode.get(ipType.ipv4), defaultMeshPort);
 										}
 										if (pushPeer(
-												new InetSocketAddress(peer.getAddress().getAddress(), defaultAPIport),
+												new InetSocketAddress(peer.getAddress().getAddress().getHostAddress(),
+														defaultAPIport),
 												tempLocal) >= 0) {
 											Node.instance().addPeer(new Peers(peer.getAddress(), peer.getType()));
 											log.debug("Adding peer after disconnect {}",
@@ -376,9 +380,9 @@ public class PD {
 							}
 							statusExecutor.shutdown();
 							// Give 1 sec buffer
-							if (!statusExecutor.awaitTermination(PD.instance().getTimeoutValue() + 1,
+							if (!statusExecutor.awaitTermination(Configuration.CONNECTION_TIMEOUT + 1,
 									TimeUnit.SECONDS)) {
-								log.warn("Threads didn't finish in {} msec.", PD.instance().getTimeoutValue() + 1);
+								log.warn("Threads didn't finish in {} msec.", Configuration.CONNECTION_TIMEOUT + 1);
 							}
 						}
 					}
@@ -421,8 +425,9 @@ public class PD {
 										}
 										if (!peersIterate.contains(new Peers(a, searchList.get(a)))
 												&& !a.equals(tempLocal2)) {
-											// For mixed nodes don't add mixed peers from ipv4, but can still search
-											// them.
+											// For mixed nodes don't add mixed peers from ipv4 and also don't search
+											// them since this will make it so the same mixed node gets searched twice
+											// with his ipv4 and ipv6 address
 											if (a.getAddress() != null && compatibleIpTypesForSearch(
 													startSearch.getType(), searchList.get(a))) {
 												InetSocketAddress aAPI = new InetSocketAddress(
@@ -442,8 +447,6 @@ public class PD {
 												}
 												// Even if the peer fails to be added, still search his peers.
 												peersIterate.add(new Peers(a, searchList.get(a)));
-												// Could only cause unnecessary overwrite
-												// peerSearch.put(a, false);
 											}
 										}
 									}
@@ -451,7 +454,7 @@ public class PD {
 							}
 						}
 					}
-					Thread.sleep(1000 * 60 * 5); // Every 5 mins
+					Thread.sleep(1000 * 60 * 6); // Every 6 mins
 				} catch (final Exception e) {
 					log.error("PD Thread Exception: ", e);
 				}
@@ -464,7 +467,7 @@ public class PD {
 	// Simple connection check with timeout (faster than API check)
 	public static boolean isPeerOnline(InetSocketAddress address) {
 		try (Socket soc = new Socket()) {
-			soc.connect(address, CONNECTION_TIMEOUT);
+			soc.connect(address, Configuration.CONNECTION_TIMEOUT);
 		} catch (IOException ex) {
 			log.debug("Peer {} not reachable.", address.getAddress().getHostAddress());
 			return false;
@@ -476,11 +479,12 @@ public class PD {
 	// Returns only "ip" if it returns the expected JSON
 	private Optional<String> isPeerRunning(InetSocketAddress address) {
 		// Checks peer online status via API ping command
+		HttpURLConnection http = null;
 		try {
 			String urlString = getHostURL(address);
 			URL url = new URL("http://" + urlString);
 			URLConnection con = url.openConnection();
-			HttpURLConnection http = (HttpURLConnection) con;
+			http = (HttpURLConnection) con;
 			http.setRequestMethod("POST");
 			http.setDoOutput(true);
 			byte[] out = "{\"command\": \"ping\"}".getBytes(StandardCharsets.UTF_8);
@@ -488,33 +492,31 @@ public class PD {
 
 			http.setFixedLengthStreamingMode(length);
 			http.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
+			http.setConnectTimeout(Configuration.CONNECTION_TIMEOUT);
+			http.setReadTimeout(Configuration.CONNECTION_TIMEOUT);
 			// Here if connection refused
 			http.connect();
 
 			try (OutputStream os = http.getOutputStream()) {
 				os.write(out);
+				os.flush();
 			}
-			ByteArrayOutputStream result = new ByteArrayOutputStream();
-			byte[] buffer = new byte[1024];
-			int length2;
-			while ((length2 = http.getInputStream().read(buffer)) != -1) {
-				result.write(buffer, 0, length2);
-			}
-			// StandardCharsets.UTF_8.name() > JDK 7
-			http.getInputStream().close();
 			// Json
-			String json = result.toString(StandardCharsets.UTF_8.name());
+			String json;
+			InputStream in = new BufferedInputStream(http.getInputStream());
+			json = org.apache.commons.io.IOUtils.toString(in, StandardCharsets.UTF_8.name());
+			// Closing the inputStream will cause a undertow connection reset by peer on the opposing API
 			String ip = JsonPath.parse(json).read("$.ip");
 
 			return Optional.of(ip);
-			// if (result.toString(StandardCharsets.UTF_8.name()).matches("\\{\"duration\":[\\d]+\\}")) {
-			// return true;
-			// }
-			// receive answer duration:x then online, if not offline. could also return round time = ping.
 		} catch (PathNotFoundException e) {
 			log.warn("JSON Path failure.");
 		} catch (IOException e) {
 			log.debug("Can't connect to API on address: {}", address.getAddress().getHostAddress());
+		} finally {
+			if (http != null) {
+				http.disconnect();
+			}
 		}
 		return Optional.empty();
 	}
@@ -522,11 +524,12 @@ public class PD {
 	// Get Peerlist from a node
 	private Map<InetSocketAddress, ipType> getPeersAndType(InetSocketAddress remote) {
 		Map<InetSocketAddress, ipType> addresses = new HashMap<InetSocketAddress, ipType>();
+		HttpURLConnection http = null;
 		try {
 			String urlString = getHostURL(remote);
 			URL url = new URL("http://" + urlString);
 			URLConnection con = url.openConnection();
-			HttpURLConnection http = (HttpURLConnection) con;
+			http = (HttpURLConnection) con;
 			http.setRequestMethod("POST");
 			http.setDoOutput(true);
 
@@ -535,22 +538,20 @@ public class PD {
 
 			http.setFixedLengthStreamingMode(length);
 			http.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
+			http.setConnectTimeout(Configuration.CONNECTION_TIMEOUT);
+			http.setReadTimeout(Configuration.CONNECTION_TIMEOUT);
 			// Here if connection refused
 			http.connect();
 
 			try (OutputStream os = http.getOutputStream()) {
 				os.write(out);
+				os.flush();
 			}
-			ByteArrayOutputStream result = new ByteArrayOutputStream();
-			byte[] buffer = new byte[1024];
-			int length2;
-			while ((length2 = http.getInputStream().read(buffer)) != -1) {
-				result.write(buffer, 0, length2);
-			}
-			// StandardCharsets.UTF_8.name() > JDK 7
-			http.getInputStream().close();
-			// Json
-			String json = result.toString(StandardCharsets.UTF_8.name());
+			// Read Json
+			String json;
+			InputStream in = new BufferedInputStream(http.getInputStream());
+			json = org.apache.commons.io.IOUtils.toString(in, StandardCharsets.UTF_8.name());
+			// Closing the inputStream will cause a undertow connection reset by peer on the opposing API
 			List<String> peerlist = JsonPath.parse(json).read("$.peerlist");
 
 			for (String p : peerlist) {
@@ -561,17 +562,22 @@ public class PD {
 			}
 		} catch (IOException e) {
 			log.debug("Can't connect to API on address: {}", remote.getAddress().getHostAddress());
+		} finally {
+			if (http != null) {
+				http.disconnect();
+			}
 		}
 		return addresses;
 	}
 
 	// 0 already added, 1 added, -1 maxed not added.
 	private Integer pushPeer(InetSocketAddress remote, InetSocketAddress local) {
+		HttpURLConnection http = null;
 		try {
 			String urlString = getHostURL(remote);
 			URL url = new URL("http://" + urlString);
 			URLConnection con = url.openConnection();
-			HttpURLConnection http = (HttpURLConnection) con;
+			http = (HttpURLConnection) con;
 			http.setRequestMethod("POST");
 			http.setDoOutput(true);
 
@@ -581,22 +587,21 @@ public class PD {
 
 			http.setFixedLengthStreamingMode(length);
 			http.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
+			http.setConnectTimeout(Configuration.CONNECTION_TIMEOUT);
+			http.setReadTimeout(Configuration.CONNECTION_TIMEOUT);
 			// Here if connection refused
 			http.connect();
 
 			try (OutputStream os = http.getOutputStream()) {
 				os.write(out);
+				os.flush();
 			}
-			ByteArrayOutputStream result = new ByteArrayOutputStream();
-			byte[] buffer = new byte[1024];
-			int length2;
-			while ((length2 = http.getInputStream().read(buffer)) != -1) {
-				result.write(buffer, 0, length2);
-			}
-			// StandardCharsets.UTF_8.name() > JDK 7
-			http.getInputStream().close();
-			// Json
-			String json = result.toString(StandardCharsets.UTF_8.name());
+			// Read Json
+			String json;
+			InputStream in = new BufferedInputStream(http.getInputStream());
+			json = org.apache.commons.io.IOUtils.toString(in, StandardCharsets.UTF_8.name());
+			// Closing the inputStream will cause a undertow connection reset by peer on the opposing API
+
 			Integer addedPeer = JsonPath.parse(json).read("$.addedPeer");
 			// 0 already added, 1 added, -1 maxed not added.
 			return addedPeer;
@@ -604,11 +609,11 @@ public class PD {
 			log.debug("Failure pushing Peer address to: {} {}", remote.getAddress().getHostAddress(), e.getMessage());
 			// in case of an error, treat as not added.
 			return -1;
+		} finally {
+			if (http != null) {
+				http.disconnect();
+			}
 		}
-	}
-
-	public int getTimeoutValue() {
-		return CONNECTION_TIMEOUT;
 	}
 
 	public ipType getIpMode() {
@@ -619,6 +624,17 @@ public class PD {
 		} else {
 			return ipType.ipv6;
 		}
+	}
+
+	// tests if the pushed ip is the right claimed type and also if its compatible with the node type.
+	public static boolean pushTest(ipType given, ipType claimed) {
+		if (compatibleIpTypes(given, claimed)) {
+			if (PD.instance().getIpMode() == ipType.mixed && given == ipType.ipv4 && claimed == ipType.mixed) {
+				return false;
+			}
+			return true;
+		}
+		return false;
 	}
 
 	public static ipType getIpTypeForAddress(InetAddress address) {
@@ -654,7 +670,7 @@ public class PD {
 	// ipv4 searches ipv4 only
 	// ipv6 searches ipv6 only
 	// mixed searches both
-	private boolean compatibleIpTypes(ipType ipMode, ipType remote) {
+	private static boolean compatibleIpTypes(ipType ipMode, ipType remote) {
 		if ((ipMode == ipType.ipv4 && remote == ipType.ipv6) || (ipMode == ipType.ipv6 && remote == ipType.ipv4)) {
 			return false;
 		}

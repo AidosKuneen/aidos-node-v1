@@ -13,8 +13,6 @@ import com.aidos.ari.service.TipsManager;
 import com.aidos.ari.service.storage.Storage;
 import com.sanityinc.jargs.CmdLineParser;
 import com.sanityinc.jargs.CmdLineParser.Option;
-import ch.qos.logback.classic.LoggerContext;
-import ch.qos.logback.core.util.StatusPrinter;
 
 // Main AIDOS Reference Implementation starting class
 public class Main {
@@ -22,12 +20,11 @@ public class Main {
 	private static final Logger log = LoggerFactory.getLogger(Main.class);
 
 	public static final String NAME = "ARI";
-	public static final String VERSION = "1.0.0.0";
+	public static final String VERSION = "1.0.1.0";
 
 	public static void main(final String[] args) {
 
 		log.info("Welcome to {} {}", NAME, VERSION);
-		
 		validateParams(args);
 		shutdownHook();
 
@@ -43,10 +40,10 @@ public class Main {
 			PD.instance().init();
 
 		} catch (final Exception e) {
-			log.error("Exception during AIDOS Node init: ", e);
+			log.error("Exception during Aidos Node init: ", e);
 			System.exit(-1);
 		}
-		log.info("AIDOS Node initialised correctly.");
+		log.info("Aidos Node initialised correctly.");
 	}
 
 	private static void validateParams(final String[] args) {
@@ -127,7 +124,7 @@ public class Main {
 		}
 
 		if (parser.getOptionValue(experimental) != null) {
-			log.info("Experimental AIDOS features turned on.");
+			log.info("Experimental Aidos features turned on.");
 			Configuration.put(DefaultConfSettings.EXPERIMENTAL, "true");
 		}
 
@@ -139,7 +136,8 @@ public class Main {
 		if (parser.getOptionValue(debug) != null) {
 			Configuration.put(DefaultConfSettings.DEBUG, "true");
 			log.info(Configuration.allSettings());
-			StatusPrinter.print((LoggerContext) LoggerFactory.getILoggerFactory());
+			log.info("You have set the debug flag. To enable debug output, you need to set <root level=\"DEBUG\"> "
+					+ "in the source tree at ari/src/main/resources/logback.xml and re-package ari.jar");
 		}
 
 	}
@@ -165,7 +163,7 @@ public class Main {
 				Storage.instance().shutdown();
 
 			} catch (final Exception e) {
-				log.error("Exception occurred shutting down AIDOS node: ", e);
+				log.error("Exception occurred shutting down Aidos node: ", e);
 			}
 		}, "Shutdown Hook"));
 	}

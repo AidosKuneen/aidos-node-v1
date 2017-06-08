@@ -1,5 +1,6 @@
 package com.aidos.ari;
 
+import com.aidos.ari.conf.Configuration;
 import com.aidos.ari.conf.ipType;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -21,10 +22,10 @@ public class Peers {
 	private int numberOfInvalidTransactions;
 	private ExecutorService exec = Executors.newFixedThreadPool(10);
 
-//	public Peers(final InetSocketAddress address) {
-//		this.address = address;
-//		this.type = ipType.no_init;
-//	}
+	// public Peers(final InetSocketAddress address) {
+	// this.address = address;
+	// this.type = ipType.no_init;
+	// }
 
 	public Peers(final InetSocketAddress address, final ipType type) {
 		this.address = address;
@@ -34,7 +35,7 @@ public class Peers {
 	public boolean isLocal() {
 		InetAddress a = address.getAddress();
 		if (a.isLinkLocalAddress() || a.isLoopbackAddress() || a.isSiteLocalAddress()) {
-			log.error("loopback adress {}", a);
+			log.error("Loopback address: {}", a);
 			return true;
 		}
 		return false;
@@ -44,11 +45,11 @@ public class Peers {
 		exec.submit(() -> {
 			DataOutputStream dos = null;
 			try (Socket s = new Socket();) {
-				s.connect(address, 2000);
+				s.connect(address, Configuration.CONNECTION_TIMEOUT);
 				dos = new DataOutputStream(s.getOutputStream());
 				dos.write(packet);
 			} catch (final IOException e) {
-				log.error("cannot send to {},{}", address, e.getMessage());
+				log.error("Can't send to {} : {}", address, e.getMessage());
 			} finally {
 				try {
 					if (dos != null) {

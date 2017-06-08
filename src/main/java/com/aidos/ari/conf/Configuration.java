@@ -15,6 +15,8 @@ public class Configuration {
 		API_PORT, API_HOST, MESH_RECEIVER_PORT, CORS_ENABLED, PEERS, LOCAL, // not used yet
 		REMOTEAPI, REMOTEWALLET, DEBUG, EXPERIMENTAL // experimental features.
 	}
+	
+	public static final int CONNECTION_TIMEOUT = 3000; // in ms
 
 	static {
 		// defaults
