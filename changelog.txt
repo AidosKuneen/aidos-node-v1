@@ -1,3 +1,7 @@
+*1.0.1.0
+	- Improved output of API
+	- Fixed port leak of peer discovery API calls
+
 *1.0.0.0
 	- Peer Discovery (+ipv6)
 	- TCP as Mesh protocol
