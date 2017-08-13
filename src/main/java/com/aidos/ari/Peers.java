@@ -49,7 +49,7 @@ public class Peers {
 				dos = new DataOutputStream(s.getOutputStream());
 				dos.write(packet);
 			} catch (final IOException e) {
-				log.error("Can't send to {} : {}", address, e.getMessage());
+				log.debug("Can't send to {} : {}", address, e.getMessage());
 			} finally {
 				try {
 					if (dos != null) {
