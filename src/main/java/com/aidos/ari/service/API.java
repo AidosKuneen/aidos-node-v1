@@ -697,6 +697,7 @@ public class API {
 				} catch (IOException e) {
 					log.error("Error writing response", e);
 					exchange.endExchange();
+					sinkChannel.getWriteSetter().set(null);
 				}
 			else {
 				exchange.endExchange();
