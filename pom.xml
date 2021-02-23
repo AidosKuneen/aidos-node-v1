@@ -131,11 +131,34 @@
 	<build>
 		<plugins>
             <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-checkstyle-plugin</artifactId>
+                <version>3.1.2</version>
+                <dependencies>
+                    <dependency>
+                        <groupId>com.puppycrawl.tools</groupId>
+                        <artifactId>checkstyle</artifactId>
+                        <version>8.40</version>
+                    </dependency>
+                </dependencies>
+                <configuration>
+                    <configLocation>google_checks.xml</configLocation>
+<!--                    <consoleOutput>true</consoleOutput>-->
+                    <failsOnError>true</failsOnError>
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>versions-maven-plugin</artifactId>
                 <version>2.5</version>
             </plugin>
-
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-compiler-plugin</artifactId>
@@ -172,7 +195,5 @@
 				</executions>
 			</plugin>
 		</plugins>
-
 	</build>
-
 </project>

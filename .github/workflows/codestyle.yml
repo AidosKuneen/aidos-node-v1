@@ -1,0 +1,12 @@
+name: Code style
+on: [push, pull_request]
+jobs:
+  checkstyle:
+    runs-on: ubuntu-latest
+    name: checkstyle
+    steps:
+      - uses: actions/checkout@v2
+      - uses: nikitasavinov/checkstyle-action@master
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }} # This token is provided by Actions, you do not need to create your own token
+          reporter: 'github-pr-check'
