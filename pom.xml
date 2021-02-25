@@ -181,9 +181,8 @@
 							<goal>shade</goal>
 						</goals>
 						<configuration>
-							<finalName>ari-${project.version}</finalName>
+							<finalName>${project.artifactId}</finalName>
 							<outputDirectory>${project.basedir}/target</outputDirectory>
-							<mainClass>com.aidos.ari.Main</mainClass>
 							<transformers>
 								<transformer
 									implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
