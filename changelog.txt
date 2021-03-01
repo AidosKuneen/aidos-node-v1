@@ -5,4 +5,3 @@
 *1.0.0.0
 	- Peer Discovery (+ipv6)
 	- TCP as Mesh protocol
-	
