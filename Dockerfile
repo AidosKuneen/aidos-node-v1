@@ -1,4 +1,4 @@
-FROM openjdk:15 AS builder
+FROM maven:3.6-openjdk-15 AS builder
 WORKDIR /build
 COPY pom.xml .
 RUN mvn dependency:go-offline
