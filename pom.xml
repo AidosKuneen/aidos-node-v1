@@ -13,7 +13,7 @@
 	<properties>
 		<java-version>1.8</java-version>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-		<undertown.version>2.2.4.Final</undertown.version>
+		<undertown.version>2.2.5.Final</undertown.version>
 	</properties>
 
 	<repositories>
@@ -184,8 +184,7 @@
 							<finalName>${project.artifactId}</finalName>
 							<outputDirectory>${project.basedir}/target</outputDirectory>
 							<transformers>
-								<transformer
-									implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+								<transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
 									<mainClass>com.aidos.ari.Main</mainClass>
 								</transformer>
 							</transformers>
