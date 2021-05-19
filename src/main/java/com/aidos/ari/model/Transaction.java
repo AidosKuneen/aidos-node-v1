@@ -118,7 +118,8 @@ public class Transaction {
         curl.squeeze(hashTrits, 0, hashTrits.length);
 
         hash = Converter.bytes(hashTrits);
-        if (hash[Hash.SIZE_IN_BYTES - 4] != 0 || hash[Hash.SIZE_IN_BYTES - 3] != 0 || hash[Hash.SIZE_IN_BYTES - 2] != 0 || hash[Hash.SIZE_IN_BYTES - 1] != 0) {
+         if (hash[Hash.SIZE_IN_BYTES - 4] != 0) { // trits 14-18 must be 0,  trits 0-12 further checked by minWeightMagnitude
+                                                  // bugfix removed Hash 0-3 as there are dangling unused trits which can be non-0
             throw new RuntimeException("Invalid transaction hash");
         }
 
