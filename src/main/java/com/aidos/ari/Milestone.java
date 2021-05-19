@@ -53,7 +53,7 @@ public class Milestone {
 
 					final int index = (int) Converter.longValue(transaction.trits(), Transaction.TAG_TRINARY_OFFSET,
 							15);
-					if (index > latestMilestoneIndex) {
+					if (index > latestMilestoneIndex && index >= 0 && index <= 1048576 ) { // valid index range up to 2^20
 						log.info("index is " + index);
 
 						final Bundle bundle = new Bundle(transaction.bundle);
