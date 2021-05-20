@@ -173,7 +173,7 @@
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-shade-plugin</artifactId>
-				<version>2.4.3</version>
+                <version>3.2.4</version>
 				<executions>
 					<execution>
 						<phase>package</phase>
@@ -181,7 +181,7 @@
 							<goal>shade</goal>
 						</goals>
 						<configuration>
-							<finalName>${project.artifactId}</finalName>
+							<finalName>${project.artifactId}-${project.version}</finalName>
 							<outputDirectory>${project.basedir}/target</outputDirectory>
 							<transformers>
 								<transformer
