@@ -20,4 +20,4 @@ jobs:
       - uses: actions/upload-artifact@v2
         with:
           name: ari.jar
-          path: ./target/ari.jar
+          path: ./target/ari*.jar
