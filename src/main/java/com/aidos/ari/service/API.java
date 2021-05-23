@@ -339,6 +339,31 @@ public class API {
 			return ExceptionResponse.create(e.getLocalizedMessage());
 		}
 	}
+	
+	public static boolean validMagnitude(Transaction transaction) {
+		boolean valid = true;
+		
+		try {
+			if (transaction == null || transaction.hash == null || transaction.hash.length < Transaction.HASH_SIZE - 16) {
+				valid = false;
+			}
+			else {
+				int weightMagnitude = 0;
+			    int[] transactionTrits = new Hash(transaction.hash, 0, Transaction.HASH_SIZE).trits();
+			    for (int pos = transactionTrits.length-1; pos>=0; pos-- ) {
+			    	if (transactionTrits[pos] == 0) weightMagnitude++;
+			    	else break;
+			    }
+			    if (weightMagnitude < TipsManager.minWeightMagnitude) {
+			    	valid = false;
+			    }
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+			valid = false;
+		}
+	    return valid;
+	}
 
 	public static boolean invalidSubmeshStatus() {
 		log.info(Milestone.latestSolidSubmeshMilestoneIndex + "," + Milestone.MILESTONE_START_INDEX);
@@ -379,7 +404,11 @@ public class API {
 				return ErrorResponse.create("Invalid trytes input.");
 			}
 			final Transaction transaction = new Transaction(Converter.trits(trytes));
-			StorageTransactions.instance().storeTransaction(transaction.hash, transaction, false);
+			
+			if (validMagnitude(transaction))			
+				StorageTransactions.instance().storeTransaction(transaction.hash, transaction, false);
+			else
+				return ErrorResponse.create("Invalid transaction weight.");
 		}
 		return AbstractResponse.createEmptyResponse();
 	}
@@ -514,7 +543,7 @@ public class API {
 		for (final String tryte : trytes2) {
 			final Transaction transaction = new Transaction(Converter.trits(tryte));
 			transaction.weightMagnitude = Curl.HASH_LENGTH;
-			Node.instance().broadcast(transaction);
+			if (validMagnitude(transaction)) Node.instance().broadcast(transaction);
 		}
 		return AbstractResponse.createEmptyResponse();
 	}
