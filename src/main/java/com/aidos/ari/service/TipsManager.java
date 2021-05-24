@@ -26,6 +26,8 @@ import com.aidos.ari.service.storage.StorageTransactions;
 
 public class TipsManager {
 
+	public static int minWeightMagnitude = 18;
+	
     private static final Logger log = LoggerFactory.getLogger(TipsManager.class);
 
     private volatile boolean shuttingDown;
@@ -100,9 +102,9 @@ public class TipsManager {
                                         validBundle = true;
 
                                         bundleTransactions.stream().filter(bundleTransaction -> bundleTransaction.value != 0).forEach(bundleTransaction -> {
-                                            final Hash address = new Hash(bundleTransaction.address);
-                                            final Long value = state.get(address);
-                                            state.put(address, value == null ? bundleTransaction.value : (value + bundleTransaction.value));
+
+                                        
+                                        
                                         });
                                         break;
                                     }
@@ -112,7 +114,11 @@ public class TipsManager {
                                     return null;
                                 }
                             }
-
+                            if (transaction.value != 0) {
+	                            final Hash address = new Hash(transaction.address);
+	                            final Long value = state.get(address);
+	                            state.put(address, value == null ? transaction.value : (value + transaction.value));
+                            }
                             nonAnalyzedTransactions.offer(transaction.trunkTransactionPointer);
                             nonAnalyzedTransactions.offer(transaction.branchTransactionPointer);
                         }
@@ -199,10 +205,24 @@ public class TipsManager {
                     if (StorageScratchpad.instance().setAnalyzedTransactionFlag(pointer)) {
 
                         final Transaction transaction = StorageTransactions.instance().loadTransaction(pointer);
+                        
                         if (transaction.type == Storage.PREFILLED_SLOT) {
                             extraTransactions = null;
                             break;
                         } else {
+                        	
+                        	int weightMagnitude = 0;
+                            int[] transactionTrits = new Hash(transaction.hash, 0, Transaction.HASH_SIZE).trits();
+                            for (int pos = transactionTrits.length-1; pos>=0; pos-- ) {
+                            	if (transactionTrits[pos] == 0) weightMagnitude++;
+                            	else break;
+                            }
+                            
+                            if (weightMagnitude < minWeightMagnitude) {
+                            	extraTransactions = null;
+                                break;
+                            }
+                        	
                             extraTransactions.add(new Hash(transaction.hash, 0, Transaction.HASH_SIZE));
                             nonAnalyzedTransactions.offer(transaction.trunkTransactionPointer);
                             nonAnalyzedTransactions.offer(transaction.branchTransactionPointer);
@@ -253,14 +273,17 @@ public class TipsManager {
                                 stateCopy.put(address, value == null ? transaction.value : (value + transaction.value));
                             }
                         }
-
+                        long total = 0l;
                         for (final long value : stateCopy.values()) {
                             if (value < 0) {
                                 extraTransactions = null;
                                 break;
                             }
+                            total += value;
                         }
-
+                        if (total != 2500000000000000l) {
+                        	log.info("discarding tip. would cause invalid state.");
+                        }
                         if (extraTransactions != null) {
                             if (extraTransactions.size() > bestRating) {
                                 bestTip = tail;
