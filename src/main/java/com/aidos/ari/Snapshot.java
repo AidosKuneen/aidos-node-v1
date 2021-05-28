@@ -1,12 +1,158 @@
 package com.aidos.ari;
 
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.Map;
+import java.util.Queue;
+import java.util.TreeSet;
+import java.util.concurrent.Semaphore;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.aidos.ari.model.Hash;
+import com.aidos.ari.model.Transaction;
+import com.aidos.ari.service.storage.Storage;
+import com.aidos.ari.service.storage.StorageScratchpad;
+import com.aidos.ari.service.storage.StorageTransactions;
 
 public class Snapshot {
+	
+	private static final Logger log = LoggerFactory.getLogger(StorageTransactions.class);
+	
+	public static final TreeSet<Long> confirmedSnapshotTransactions = new TreeSet<Long>(); // pointer to all snapshot-confirmed transactions 
+	// note: requires 200-300 MB memory but speeds up API calls significantly
+	
+	public static HashMap<Hash, Long> latestSnapshot;
+	private static int latestSnapshotMilestoneIndex = Milestone.MILESTONE_START_INDEX;
+	
+	public int getLatestSnapshotMilestoneIndex() {
+		return latestSnapshotMilestoneIndex;
+	}
+	
+	// we use a semaphore to allow up to X processes to read the latest snapshot, while blocking during update of the snapshot
+	public static final int MAX_CONCURRENT = 100;
+	public static final Semaphore updateSnapshotSemaphore = new Semaphore(MAX_CONCURRENT);
+	
+	// get snapshot for latest solid milestone and flag confirmed transactions as confirmed
+	public static HashMap<Hash, Long> updateSnapshot() {
+		// need to wait until no more getBalances or getInclusionStates are running
+		try{
+			updateSnapshotSemaphore.acquireUninterruptibly(MAX_CONCURRENT);
+			
+			if (Milestone.latestSolidSubmeshMilestoneIndex == latestSnapshotMilestoneIndex) {
+				log.info("updateSnapshot: current snaphot is the latest");
+				return latestSnapshot;
+			}
+	
+			HashMap<Hash, Long> snapshot = new HashMap<Hash, Long>();
+			// deep copy initial state
+			for (Hash kh : initialState.keySet()) {
+				snapshot.put(new Hash(kh.bytes()), new Long(initialState.get(kh)));
+			}
+			
+			int solidMilestoneIndex;
+			byte[] solidMilestoneBytes;
+			
+			solidMilestoneIndex = Milestone.latestSolidSubmeshMilestoneIndex;
+			solidMilestoneBytes = Milestone.latestSolidSubmeshMilestone.bytes();
+		
+			log.info("requesting snapshot for milestone={}", solidMilestoneIndex);
+			if (solidMilestoneIndex > Milestone.MILESTONE_START_INDEX) {
+		
+				log.info("clearing confirmedSnapshotTransactions");
+				confirmedSnapshotTransactions.clear();
+				final Transaction ms = StorageTransactions.instance().loadTransaction(solidMilestoneBytes);
+				
+				final Queue<Long> nonAnalyzedTransactions = new LinkedList<>(Collections.singleton(ms.pointer));
+	            Long pointer;
+	            
+	            synchronized (StorageScratchpad.instance().getAnalyzedTransactionsFlags()) {
+	            	
+					StorageScratchpad.instance().clearAnalyzedTransactionsFlags();
+					long transactionCount = 0;
+		            while ((pointer = nonAnalyzedTransactions.poll()) != null) {
+		
+		                 if (StorageScratchpad.instance().setAnalyzedTransactionFlag(pointer)) {
+		                	if (transactionCount%100000==0)
+									log.info("updateSnapshot: checked {} transactions",transactionCount);
+							transactionCount++;
+		                	confirmedSnapshotTransactions.add(pointer);
+		                	 
+		                    final Transaction transaction = StorageTransactions.instance().loadTransaction(pointer);
+		                    if (transaction.type == Storage.PREFILLED_SLOT) {
+		                    	 log.error("getSnapshotForLatestSolidMilestone found inconsistent mesh!");
+		                 		 return null; // mesh inconsistent (solid milestone should not have 'holes')
+		                    } else {
+								if (transaction.value != 0) {
+									final Hash address = new Hash(transaction.address);
+									final Long value = snapshot.getOrDefault(address,  0L);
+									if ((value + transaction.value) == 0) {
+										snapshot.remove(address); // remove if 0
+									}
+									else {
+										snapshot.put(address, value + transaction.value);
+									}
+								}
+								nonAnalyzedTransactions.offer(transaction.trunkTransactionPointer);
+								nonAnalyzedTransactions.offer(transaction.branchTransactionPointer);
+		                     }
+		                 }
+		            }
+	            }
+	            
+	            long total = 0L;
+	            for (Long value : snapshot.values()) {
+	            	if (value < 0) {
+	            		 log.error("getSnapshotForLatestSolidMilestone found inconsistent mesh! (negative address balance)");
+	            		 return null;
+	            	}
+	            	total += value;
+	            }
+	            if (total != 2500000000000000L) {
+	            	log.error("getSnapshotForLatestSolidMilestone found inconsistent mesh! (invalid ledger balance: {})",total);
+	       		 	return null;
+	            }
+	            
+	            log.info("confirmed {} transactions : confirmedSnapshotTransactions", confirmedSnapshotTransactions.size());
+				
+			}
+		
+			
+			synchronized(latestSnapshot) {
+				latestSnapshot = new HashMap<Hash, Long>(snapshot);
+				// store in file also
+				try {
+					File snapshotFile = new File("mesh.snapshot");
+					if (snapshotFile.exists()) snapshotFile.delete();
+					BufferedWriter writer = new BufferedWriter(new FileWriter(snapshotFile));
+					writer.write("#milestone="+solidMilestoneIndex); //properties format but this is a properties comment
+					for (Hash h : latestSnapshot.keySet()) {
+						writer.write(h.toString()+"="+latestSnapshot.get(h));
+						writer.newLine();
+					}
+					writer.close();
+					log.info("snapshot {} written to mesh.snapshot", solidMilestoneIndex);
+				} catch (IOException e) {
+					e.printStackTrace(); // log but no throw
+				}
+			}
+			log.info("snapshot performed for milestone={}",Milestone.latestSolidSubmeshMilestoneIndex);
+			
+			return latestSnapshot;
+		}
+		finally {
+			updateSnapshotSemaphore.release(MAX_CONCURRENT); // this always gets done
+		}
+	}
 
-    public static final Map<Hash, Long> initialState = new HashMap<>();
+    // this is the genesis snapshot
+	public static final Map<Hash, Long> initialState = new HashMap<>();
 
     static {
     	initialState.put(new Hash("OZZIZKFIQPGBLZKWLTBNMFKKTHFKYOYTRMGJU9AJTVRI9BUKULPQFFPZT9AIT9GTQSZLKKLVLXDVCYLZZ"), 55964400000000L);
@@ -53,5 +199,8 @@ public class Snapshot {
     	initialState.put(new Hash("JDEUWDBRNPBPWHZXCBUDLQRAZYUHAVXWGWLVPYPDPBZQTMPCWADXQDWWFQSDKYVXNASTKKHVUFXFZOMBE"), 57549100000000L);
     	initialState.put(new Hash("AUVBUAHWJHDXZWKKMCSOCVNSYMLQYGRSWEDOGFYKWYTNJRSJCHNLANZ9B9QXWKMRZHBCHCEVIWEQJKRDZ"), 56076525000000L);
     	initialState.put(new Hash("NYFB9URUDMCZCZLXNQFVLKFAQUANROBHWYNQMLIGRXSNOSZGEFCVCVCKPKYSPQERYTWCLIDHVXBYAJIKF"), 56253525000000L);
+    	
+    	latestSnapshot = new HashMap<>(initialState);
+    	
     }
 }
