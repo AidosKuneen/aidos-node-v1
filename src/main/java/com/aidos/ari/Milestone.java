@@ -203,8 +203,8 @@ public class Milestone {
 					latestSolidSubmeshMilestone = milestone;
 					latestSolidSubmeshMilestoneIndex = milestoneIndex;
 					if (initialScanCompleted && !initialSnapshotCompleted) {
-						Snapshot.updateSnapshot(); // updating the first snapshot (e.g. after a restart). thereafter it has to be requested via an API call
 						initialSnapshotCompleted = true;
+						Snapshot.updateSnapshot(); // updating the first snapshot (e.g. after a restart). thereafter it has to be requested via an API call
 					}
 					return;
 				}
