@@ -13,7 +13,7 @@
 	<properties>
 		<java-version>1.8</java-version>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-		<undertown.version>2.2.4.Final</undertown.version>
+		<undertown.version>2.2.9.Final</undertown.version>
 	</properties>
 
 	<repositories>
@@ -106,7 +106,7 @@
 		<dependency>
 			<groupId>com.jayway.jsonpath</groupId>
 			<artifactId>json-path</artifactId>
-			<version>2.5.0</version>
+			<version>2.6.0</version>
 			<exclusions>
         		<exclusion>
           			<artifactId>asm</artifactId>
@@ -184,8 +184,7 @@
 							<finalName>${project.artifactId}-${project.version}</finalName>
 							<outputDirectory>${project.basedir}/target</outputDirectory>
 							<transformers>
-								<transformer
-									implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+								<transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
 									<mainClass>com.aidos.ari.Main</mainClass>
 								</transformer>
 							</transformers>
