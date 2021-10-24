@@ -45,7 +45,6 @@ public class Milestone {
 	private static final Map<Integer, Hash> milestones = new ConcurrentHashMap<>();
 
 	private static Boolean initialScanCompleted = false; // perform an initial scan of the milestone storage to speed up node restarts
-	private static Boolean initialSnapshotCompleted = false; 
 	
 	static class MilestoneElement implements Comparable<MilestoneElement> { 
 		int msindex = 0;
@@ -202,10 +201,6 @@ public class Milestone {
 				if (solid) {
 					latestSolidSubmeshMilestone = milestone;
 					latestSolidSubmeshMilestoneIndex = milestoneIndex;
-					if (initialScanCompleted && !initialSnapshotCompleted) {
-						initialSnapshotCompleted = true;
-						Snapshot.updateSnapshot(); // updating the first snapshot (e.g. after a restart). thereafter it has to be requested via an API call
-					}
 					return;
 				}
 			}

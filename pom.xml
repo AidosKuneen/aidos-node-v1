@@ -5,7 +5,7 @@
 
 	<groupId>groupId</groupId>
 	<artifactId>ari</artifactId>
-	<version>1.0.2.0</version>
+	<version>1.0.2.1</version>
 
 	<name>ARI</name>
 	<description>Aidos Reference Implementation.</description>

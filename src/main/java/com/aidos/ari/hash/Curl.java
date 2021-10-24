@@ -3,6 +3,7 @@ package com.aidos.ari.hash;
 public class Curl {
 
     public static final int HASH_LENGTH = 243;
+    public static final int HASH_LENGTH_3 = 729;
     private static final int STATE_LENGTH = 3 * HASH_LENGTH;
 
     private static final int NUMBER_OF_ROUNDS = 27;
@@ -45,6 +46,14 @@ public class Curl {
         for (int stateIndex = 0; stateIndex < STATE_LENGTH; stateIndex++) {
             state[stateIndex] = 0;
         }
+    }
+    
+    public void squeeze729(final int[] trits, int offset, int length) {
+        do {
+            System.arraycopy(state, 0, trits, offset, length < HASH_LENGTH_3 ? length : HASH_LENGTH_3);
+            transform();
+            offset += HASH_LENGTH_3;
+        } while ((length -= HASH_LENGTH_3) > 0);
     }
     
 }
