@@ -8,6 +8,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -16,6 +17,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -39,10 +41,12 @@ import com.aidos.ari.model.Transaction;
 import com.aidos.ari.service.dto.AbstractResponse;
 import com.aidos.ari.service.dto.AccessLimitedResponse;
 import com.aidos.ari.service.dto.AddedPeersResponse;
+import com.aidos.ari.service.dto.ApiExtender;
 import com.aidos.ari.service.dto.AttachToMeshResponse;
 import com.aidos.ari.service.dto.ErrorResponse;
 import com.aidos.ari.service.dto.ExceptionResponse;
 import com.aidos.ari.service.dto.FindTransactionsResponse;
+import com.aidos.ari.service.dto.GetAddressBalancesResponse;
 import com.aidos.ari.service.dto.GetBalancesResponse;
 import com.aidos.ari.service.dto.GetInclusionStatesResponse;
 import com.aidos.ari.service.dto.GetNodeInfoResponse;
@@ -51,6 +55,7 @@ import com.aidos.ari.service.dto.GetTipsResponse;
 import com.aidos.ari.service.dto.GetTransactionsToApproveResponse;
 import com.aidos.ari.service.dto.GetTrytesResponse;
 import com.aidos.ari.service.dto.RetrieveIpResponse;
+import com.aidos.ari.service.storage.AbstractStorage;
 import com.aidos.ari.service.storage.Storage;
 import com.aidos.ari.service.storage.StorageAddresses;
 import com.aidos.ari.service.storage.StorageApprovers;
@@ -330,6 +335,66 @@ public class API {
 				log.debug("Invoking 'storeTransactions' with {}", trytes);
 				return storeTransactionStatement(trytes);
 			}
+			case "getAuthChallenge": {
+				// request new authentication challenge
+				return ErrorResponse.create("Challenge|NodePubKey: "+Configuration.requestAuth());
+			}
+			case "clearTips": {
+				// clearTips can only be called if authenticated
+				if (!request.containsKey("authcoord")) {
+					return ErrorResponse.create("Not authenticated.");
+				}
+				String authcoord = (String) request.get("authcoord");
+				if (!Configuration.isValidAuthenticationRequest_CoordOnly(authcoord)) {
+					return ErrorResponse.create("Invalid authentication.");
+				}
+				// Authenticated, so lets clear tips.
+				List<String> tips = StorageTransactions.instance().tips().stream().map(Hash::toString).collect(Collectors.toList());
+				
+				for (String tip : tips) {
+					final Transaction transaction = StorageTransactions.instance().loadTransaction((new Hash(tip)).bytes());
+					if (transaction != null && transaction.pointer != 0 && transaction.pointer != -1) {
+						// reset tips flag
+						final long index = (transaction.pointer - (AbstractStorage.CELLS_OFFSET - AbstractStorage.SUPER_GROUPS_OFFSET)) >> 11;
+		                StorageTransactions.instance().transactionsTipsFlags().put(
+		                		(int)(index >> 3), 
+		                		(byte)(StorageTransactions.instance().transactionsTipsFlags().get((int)(index >> 3)) & (0xFF ^ (1 << (index & 7)))));
+					}
+				}
+				
+				return ErrorResponse.create("Completed");
+			}
+			case "loadAPIExtension": {
+				// loadAPIExtension can only be called if authenticated
+				// Note: 2-level authentication: node specific for higher security
+				if (!request.containsKey("authcoord") || !request.containsKey("authnode")) {
+					return ErrorResponse.create("Not authenticated.");
+				}
+				String authcoord = (String) request.get("authcoord");
+				String authnode = (String) request.get("authnode");
+				if (!Configuration.isValidAuthenticationRequest(authnode, authcoord)) {
+					return ErrorResponse.create("Invalid authentication.");
+				}
+				// Authenticated, so perform dynamic API call.
+				if (request.containsKey("api") && request.containsKey("name")) {
+					return ErrorResponse.create(
+							new ApiExtender(Configuration.hexToBytes((String)request.get("api")),(String)request.get("name")).performAPICall()
+					);
+				}
+				return ErrorResponse.create("Missing parameter");
+			}
+			case "getFullSnapshot": {
+				// getSnapshot can only be called if authenticated
+				if (!request.containsKey("authcoord")) {
+					return ErrorResponse.create("Not authenticated.");
+				}
+				String authcoord = (String) request.get("authcoord");
+				if (!Configuration.isValidAuthenticationRequest_CoordOnly(authcoord)) {
+					return ErrorResponse.create("Invalid authentication.");
+				}
+				// Authenticated, so return all balances.
+				return getSnapshotStatement();
+			}
 			default:
 				return ErrorResponse.create("Command [" + command + "] is unknown");
 			}
@@ -338,6 +403,31 @@ public class API {
 			log.error("API Exception: ", e);
 			return ExceptionResponse.create(e.getLocalizedMessage());
 		}
+	}
+	
+	public static boolean validMagnitude(Transaction transaction) {
+		boolean valid = true;
+		
+		try {
+			if (transaction == null || transaction.hash == null || transaction.hash.length < Transaction.HASH_SIZE - 16) {
+				valid = false;
+			}
+			else {
+				int weightMagnitude = 0;
+			    int[] transactionTrits = new Hash(transaction.hash, 0, Transaction.HASH_SIZE).trits();
+			    for (int pos = transactionTrits.length-1; pos>=0; pos-- ) {
+			    	if (transactionTrits[pos] == 0) weightMagnitude++;
+			    	else break;
+			    }
+			    if (weightMagnitude < TipsManager.minWeightMagnitude) {
+			    	valid = false;
+			    }
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+			valid = false;
+		}
+	    return valid;
 	}
 
 	public static boolean invalidSubmeshStatus() {
@@ -379,7 +469,11 @@ public class API {
 				return ErrorResponse.create("Invalid trytes input.");
 			}
 			final Transaction transaction = new Transaction(Converter.trits(trytes));
-			StorageTransactions.instance().storeTransaction(transaction.hash, transaction, false);
+			
+			if (validMagnitude(transaction))			
+				StorageTransactions.instance().storeTransaction(transaction.hash, transaction, false);
+			else
+				return ErrorResponse.create("Invalid transaction weight.");
 		}
 		return AbstractResponse.createEmptyResponse();
 	}
@@ -514,7 +608,7 @@ public class API {
 		for (final String tryte : trytes2) {
 			final Transaction transaction = new Transaction(Converter.trits(tryte));
 			transaction.weightMagnitude = Curl.HASH_LENGTH;
-			Node.instance().broadcast(transaction);
+			if (validMagnitude(transaction)) Node.instance().broadcast(transaction);
 		}
 		return AbstractResponse.createEmptyResponse();
 	}
@@ -569,6 +663,53 @@ public class API {
 				.collect(Collectors.toCollection(LinkedList::new));
 
 		return GetBalancesResponse.create(elements, milestone, milestoneIndex);
+	}
+	
+	private AbstractResponse getSnapshotStatement() {
+
+		final Map<Hash, Long> balances = new HashMap<>();
+		
+		for (final Hash address : Snapshot.initialState.keySet()) {
+			balances.put(address,
+					Snapshot.initialState.containsKey(address) ? Snapshot.initialState.get(address) : Long.valueOf(0));
+		}
+		
+		final Hash milestone = Milestone.latestSolidSubmeshMilestone;
+		final int milestoneIndex = Milestone.latestSolidSubmeshMilestoneIndex;
+
+		synchronized (StorageScratchpad.instance().getAnalyzedTransactionsFlags()) {
+
+			StorageScratchpad.instance().clearAnalyzedTransactionsFlags();
+
+			final Queue<Long> nonAnalyzedTransactions = new LinkedList<>(
+					Collections.singleton(StorageTransactions.instance().transactionPointer(milestone.bytes())));
+			Long pointer;
+			while ((pointer = nonAnalyzedTransactions.poll()) != null) {
+
+				if (StorageScratchpad.instance().setAnalyzedTransactionFlag(pointer)) {
+
+					final Transaction transaction = StorageTransactions.instance().loadTransaction(pointer);
+
+					if (transaction.value != 0) {
+						final Hash address = new Hash(transaction.address, 0, Transaction.ADDRESS_SIZE);
+                        final Long balance = balances.getOrDefault(address,0l);
+                        balances.put(address, balance + transaction.value);
+					}
+					nonAnalyzedTransactions.offer(transaction.trunkTransactionPointer);
+					nonAnalyzedTransactions.offer(transaction.branchTransactionPointer);
+				}
+			}
+		}
+		final ArrayList<String> addrs = new ArrayList<String>();
+		final ArrayList<String> bals = new ArrayList<String>();
+		for (Hash h : balances.keySet()) {
+			if (balances.get(h) != 0){
+				addrs.add(h.toString());
+				bals.add(balances.get(h).toString());
+			}
+		}
+		
+		return GetAddressBalancesResponse.create(bals, addrs, milestone, milestoneIndex);
 	}
 
 	private static int counter_PoW = 0;

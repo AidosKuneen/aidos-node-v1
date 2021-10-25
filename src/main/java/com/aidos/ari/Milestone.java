@@ -1,7 +1,9 @@
 package com.aidos.ari;
 
 import java.net.InetSocketAddress;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -42,9 +44,56 @@ public class Milestone {
 	private static final Set<Long> analyzedMilestoneCandidates = new HashSet<>();
 	private static final Map<Integer, Hash> milestones = new ConcurrentHashMap<>();
 
+	private static Boolean initialScanCompleted = false; // perform an initial scan of the milestone storage to speed up node restarts
+	
+	static class MilestoneElement implements Comparable<MilestoneElement> { 
+		int msindex = 0;
+		long pointer = -1;
+		MilestoneElement(Long p_pointer) {
+			pointer = p_pointer;
+			final Transaction transaction = StorageTransactions.instance().loadTransaction(pointer);
+			msindex = (int) Converter.longValue(transaction.trits(), Transaction.TAG_TRINARY_OFFSET,15);
+			if (msindex > 1048576 || msindex < 0)
+				msindex = -1;
+	    }
+		@Override
+		public int compareTo(MilestoneElement me) {
+			return msindex-me.msindex;
+		}
+	}
+	
 	public static void updateLatestMilestone() {
-
-		for (final Long pointer : StorageAddresses.instance().addressesOf(COORDINATOR)) {
+		
+		List<Long> cooTransPointers = StorageAddresses.instance().addressesOf(COORDINATOR); // load all transactions with address==coo
+		
+		synchronized(initialScanCompleted) { // for the initial load we will rearrange this list so high ms candidates come first
+			if (!initialScanCompleted) {
+				log.info("performing initial milestone scan sort on {} transactions",cooTransPointers.size());
+				List<MilestoneElement> meList= new ArrayList<MilestoneElement>();
+				int percCompleted = 0, lastPercCompleted = -1, counter = 0;
+				for (final Long pointer : cooTransPointers) {
+					percCompleted = (int)((counter++)*100.0/cooTransPointers.size());
+					if (percCompleted>lastPercCompleted) {
+						lastPercCompleted = percCompleted;
+						log.info("initial storage milestone load {}% complete",percCompleted);
+					}
+					MilestoneElement me = new MilestoneElement(pointer);
+					if (me.msindex>=0)
+						meList.add(new MilestoneElement(pointer));
+				}	
+				Collections.sort(meList); // sort by Milestone Index
+				Collections.reverse(meList); // and reverse (latest MS first)
+				initialScanCompleted = true;
+				if (meList.size()>0) {
+					cooTransPointers.clear();
+					for (MilestoneElement me2 : meList) {
+						cooTransPointers.add(me2.pointer);
+					}
+				}
+			}
+		}
+		
+		for (final Long pointer : cooTransPointers) {
 
 			if (analyzedMilestoneCandidates.add(pointer)) {
 
@@ -122,18 +171,20 @@ public class Milestone {
 			if (milestone != null) {
 
 				boolean solid = true;
-
+				log.info("solidSubmeshMilestone: checking solidity for MS {}",milestoneIndex);
 				synchronized (StorageScratchpad.instance().getAnalyzedTransactionsFlags()) {
 
 					StorageScratchpad.instance().clearAnalyzedTransactionsFlags();
-
+					Long transactionCount = 0L;
 					final Queue<Long> nonAnalyzedTransactions = new LinkedList<>();
 					nonAnalyzedTransactions.offer(StorageTransactions.instance().transactionPointer(milestone.bytes()));
 					Long pointer;
 					while ((pointer = nonAnalyzedTransactions.poll()) != null) {
-
 						if (StorageScratchpad.instance().setAnalyzedTransactionFlag(pointer)) {
-
+							if (transactionCount%100000==0)
+								log.info("solidSubmeshMilestone: checked {} transactions",transactionCount);
+							transactionCount++;
+							
 							final Transaction transaction2 = StorageTransactions.instance().loadTransaction(pointer);
 							if (transaction2.type == AbstractStorage.PREFILLED_SLOT) {
 								solid = false;

@@ -1,6 +1,4 @@
-[![Build Status](https://travis-ci.org/AidosKuneen/aidos-node.svg?branch=master)](https://travis-ci.org/AidosKuneen/aidos-node)
 [![GitHub license](https://img.shields.io/badge/license-GPLv3-blue.svg)](https://raw.githubusercontent.com/AidosKuneen/aidos-node/master/LICENSE)
-
 
 ## Introduction
 
