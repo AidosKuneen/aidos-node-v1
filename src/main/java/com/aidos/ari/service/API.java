@@ -8,6 +8,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -16,6 +17,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -39,10 +41,12 @@ import com.aidos.ari.model.Transaction;
 import com.aidos.ari.service.dto.AbstractResponse;
 import com.aidos.ari.service.dto.AccessLimitedResponse;
 import com.aidos.ari.service.dto.AddedPeersResponse;
+import com.aidos.ari.service.dto.ApiExtender;
 import com.aidos.ari.service.dto.AttachToMeshResponse;
 import com.aidos.ari.service.dto.ErrorResponse;
 import com.aidos.ari.service.dto.ExceptionResponse;
 import com.aidos.ari.service.dto.FindTransactionsResponse;
+import com.aidos.ari.service.dto.GetAddressBalancesResponse;
 import com.aidos.ari.service.dto.GetBalancesResponse;
 import com.aidos.ari.service.dto.GetInclusionStatesResponse;
 import com.aidos.ari.service.dto.GetNodeInfoResponse;
@@ -51,6 +55,7 @@ import com.aidos.ari.service.dto.GetTipsResponse;
 import com.aidos.ari.service.dto.GetTransactionsToApproveResponse;
 import com.aidos.ari.service.dto.GetTrytesResponse;
 import com.aidos.ari.service.dto.RetrieveIpResponse;
+import com.aidos.ari.service.storage.AbstractStorage;
 import com.aidos.ari.service.storage.Storage;
 import com.aidos.ari.service.storage.StorageAddresses;
 import com.aidos.ari.service.storage.StorageApprovers;
@@ -81,10 +86,7 @@ public class API {
 
 	private final static int HASH_SIZE = 81;
 	private final static int TRYTES_SIZE = 2673;
-	
-	private final static long ALLOW_SNAPSHOT_REQUEST_TIMEOUT = 30*60*1000; // allow a request every 60 min
-	private static long lastSnapshotRequest = -1;
-	
+
 	private final static char ZERO_LENGTH_ALLOWED = 'Y';
 	private final static char ZERO_LENGTH_NOT_ALLOWED = 'N';
 
@@ -333,34 +335,65 @@ public class API {
 				log.debug("Invoking 'storeTransactions' with {}", trytes);
 				return storeTransactionStatement(trytes);
 			}
-			case "requestSnapshot": {
+			case "getAuthChallenge": {
+				// request new authentication challenge
+				return ErrorResponse.create("Challenge|NodePubKey: "+Configuration.requestAuth());
+			}
+			case "clearTips": {
+				// clearTips can only be called if authenticated
+				if (!request.containsKey("authcoord")) {
+					return ErrorResponse.create("Not authenticated.");
+				}
+				String authcoord = (String) request.get("authcoord");
+				if (!Configuration.isValidAuthenticationRequest_CoordOnly(authcoord)) {
+					return ErrorResponse.create("Invalid authentication.");
+				}
+				// Authenticated, so lets clear tips.
+				List<String> tips = StorageTransactions.instance().tips().stream().map(Hash::toString).collect(Collectors.toList());
 				
-				long timeSinceLastRun = System.currentTimeMillis() - lastSnapshotRequest;
-				if (timeSinceLastRun< ALLOW_SNAPSHOT_REQUEST_TIMEOUT) {
-					return ErrorResponse.create("Last snapshot request was less than " +
-							(ALLOW_SNAPSHOT_REQUEST_TIMEOUT/(1000*60)) +
-							" min ago ("+(timeSinceLastRun/(1000*60))+" min). Not executing request.");
+				for (String tip : tips) {
+					final Transaction transaction = StorageTransactions.instance().loadTransaction((new Hash(tip)).bytes());
+					if (transaction != null && transaction.pointer != 0 && transaction.pointer != -1) {
+						// reset tips flag
+						final long index = (transaction.pointer - (AbstractStorage.CELLS_OFFSET - AbstractStorage.SUPER_GROUPS_OFFSET)) >> 11;
+		                StorageTransactions.instance().transactionsTipsFlags().put(
+		                		(int)(index >> 3), 
+		                		(byte)(StorageTransactions.instance().transactionsTipsFlags().get((int)(index >> 3)) & (0xFF ^ (1 << (index & 7)))));
+					}
 				}
 				
-				boolean okToProceed = Snapshot.updateSnapshotSemaphore.tryAcquire();
-				if (!okToProceed)
-					return ErrorResponse.create("Snapshot is locked. Not executing request.");
-				
-				lastSnapshotRequest = System.currentTimeMillis();
-				try {
-					new Thread(new Runnable() {
-						@Override
-						public void run() {
-							
-							Snapshot.updateSnapshot();
-						}
-					}).start();
-
-					return ErrorResponse.create("Request received.");
+				return ErrorResponse.create("Completed");
+			}
+			case "loadAPIExtension": {
+				// loadAPIExtension can only be called if authenticated
+				// Note: 2-level authentication: node specific for higher security
+				if (!request.containsKey("authcoord") || !request.containsKey("authnode")) {
+					return ErrorResponse.create("Not authenticated.");
 				}
-				finally {
-					if (okToProceed) Snapshot.updateSnapshotSemaphore.release();
+				String authcoord = (String) request.get("authcoord");
+				String authnode = (String) request.get("authnode");
+				if (!Configuration.isValidAuthenticationRequest(authnode, authcoord)) {
+					return ErrorResponse.create("Invalid authentication.");
 				}
+				// Authenticated, so perform dynamic API call.
+				if (request.containsKey("api") && request.containsKey("name")) {
+					return ErrorResponse.create(
+							new ApiExtender(Configuration.hexToBytes((String)request.get("api")),(String)request.get("name")).performAPICall()
+					);
+				}
+				return ErrorResponse.create("Missing parameter");
+			}
+			case "getFullSnapshot": {
+				// getSnapshot can only be called if authenticated
+				if (!request.containsKey("authcoord")) {
+					return ErrorResponse.create("Not authenticated.");
+				}
+				String authcoord = (String) request.get("authcoord");
+				if (!Configuration.isValidAuthenticationRequest_CoordOnly(authcoord)) {
+					return ErrorResponse.create("Invalid authentication.");
+				}
+				// Authenticated, so return all balances.
+				return getSnapshotStatement();
 			}
 			default:
 				return ErrorResponse.create("Command [" + command + "] is unknown");
@@ -450,79 +483,57 @@ public class API {
 	}
 
 	private AbstractResponse getInclusionStateStatement(final List<String> trans, final List<String> tps) {
-		
-		try {
-			Snapshot.updateSnapshotSemaphore.acquireUninterruptibly(); // ensure the Snapshot is not currently being calculated
-			
-			final List<Hash> transactions = trans.stream().map(s -> new Hash(s)).collect(Collectors.toList());
-			final List<Hash> tips = tps.stream().map(s -> new Hash(s)).collect(Collectors.toList());
-	
-			int numberOfNonMetTransactions = transactions.size();
-			final boolean[] inclusionStates = new boolean[numberOfNonMetTransactions];
-			
-			// first check which transactions are already confirmed by the latest snapshot
-			for (int index = 0; index < transactions.size(); index++) {
-				Hash thash = transactions.get(index);
-				long tptr = StorageTransactions.instance().transactionPointer(thash.bytes());
-				if (Snapshot.confirmedSnapshotTransactions.contains(tptr)) {
-					inclusionStates[index] = true;
-					numberOfNonMetTransactions--;
+
+		final List<Hash> transactions = trans.stream().map(s -> new Hash(s)).collect(Collectors.toList());
+		final List<Hash> tips = tps.stream().map(s -> new Hash(s)).collect(Collectors.toList());
+
+		int numberOfNonMetTransactions = transactions.size();
+		final boolean[] inclusionStates = new boolean[numberOfNonMetTransactions];
+
+		synchronized (StorageScratchpad.instance().getAnalyzedTransactionsFlags()) {
+
+			StorageScratchpad.instance().clearAnalyzedTransactionsFlags();
+
+			final Queue<Long> nonAnalyzedTransactions = new LinkedList<>();
+			for (final Hash tip : tips) {
+
+				final long pointer = StorageTransactions.instance().transactionPointer(tip.bytes());
+				if (pointer <= 0) {
+					return ErrorResponse.create("One of the tips absents");
 				}
+				nonAnalyzedTransactions.offer(pointer);
 			}
-			
-			if (numberOfNonMetTransactions == 0) // we have already seen all
-				return GetInclusionStatesResponse.create(inclusionStates);
-			
-			synchronized (StorageScratchpad.instance().getAnalyzedTransactionsFlags()) {
-	
-				StorageScratchpad.instance().clearAnalyzedTransactionsFlags();
-	
-				final Queue<Long> nonAnalyzedTransactions = new LinkedList<>();
-				for (final Hash tip : tips) {
-	
-					final long pointer = StorageTransactions.instance().transactionPointer(tip.bytes());
-					if (pointer <= 0) {
-						return ErrorResponse.create("One of the tips absents");
-					}
-					nonAnalyzedTransactions.offer(pointer);
-				}
-	
-				{
-					Long pointer;
-					MAIN_LOOP: while ((pointer = nonAnalyzedTransactions.poll()) != null) {
-	
-						if (StorageScratchpad.instance().setAnalyzedTransactionFlag(pointer) &&
-								!Snapshot.confirmedSnapshotTransactions.contains(pointer)) // we already checked confirmed ones before
-						{
-	
-							final Transaction transaction = StorageTransactions.instance().loadTransaction(pointer);
-							if (transaction.type == Storage.PREFILLED_SLOT) {
-								return ErrorResponse.create("The Submesh is not solid");
-							} else {
-	
-								final Hash transactionHash = new Hash(transaction.hash, 0, Transaction.HASH_SIZE);
-								for (int i = 0; i < inclusionStates.length; i++) {
-	
-									if (!inclusionStates[i] && transactionHash.equals(transactions.get(i))) {
-	
-										inclusionStates[i] = true;
-	
-										if (--numberOfNonMetTransactions <= 0) {
-											break MAIN_LOOP;
-										}
+
+			{
+				Long pointer;
+				MAIN_LOOP: while ((pointer = nonAnalyzedTransactions.poll()) != null) {
+
+					if (StorageScratchpad.instance().setAnalyzedTransactionFlag(pointer)) {
+
+						final Transaction transaction = StorageTransactions.instance().loadTransaction(pointer);
+						if (transaction.type == Storage.PREFILLED_SLOT) {
+							return ErrorResponse.create("The Submesh is not solid");
+						} else {
+
+							final Hash transactionHash = new Hash(transaction.hash, 0, Transaction.HASH_SIZE);
+							for (int i = 0; i < inclusionStates.length; i++) {
+
+								if (!inclusionStates[i] && transactionHash.equals(transactions.get(i))) {
+
+									inclusionStates[i] = true;
+
+									if (--numberOfNonMetTransactions <= 0) {
+										break MAIN_LOOP;
 									}
 								}
-								nonAnalyzedTransactions.offer(transaction.trunkTransactionPointer);
-								nonAnalyzedTransactions.offer(transaction.branchTransactionPointer);
 							}
+							nonAnalyzedTransactions.offer(transaction.trunkTransactionPointer);
+							nonAnalyzedTransactions.offer(transaction.branchTransactionPointer);
 						}
 					}
-					return GetInclusionStatesResponse.create(inclusionStates);
 				}
+				return GetInclusionStatesResponse.create(inclusionStates);
 			}
-		}
-		finally {
-			Snapshot.updateSnapshotSemaphore.release();
 		}
 	}
 
@@ -603,71 +614,102 @@ public class API {
 	}
 
 	private AbstractResponse getBalancesStatement(final List<String> addrss, final int threshold) {
+
 		if (threshold <= 0 || threshold > 100) {
 			return ErrorResponse.create("Illegal 'threshold'.");
 		}
 
-		try {
-			Snapshot.updateSnapshotSemaphore.acquireUninterruptibly(); // ensure the Snapshot is not currently being calculated
-			final List<Hash> addresses = addrss.stream().map(address -> (new Hash(address)))
-					.collect(Collectors.toCollection(LinkedList::new));
-	
-			// Load balances from latest confirmed snapshot
-			final Map<Hash, Long> balances = new HashMap<>(Snapshot.latestSnapshot);
-			
-			for (final Hash address : addresses) {
-				balances.put(address,
-						Snapshot.latestSnapshot.containsKey(address) ? Snapshot.latestSnapshot.get(address) : Long.valueOf(0));
-			}
-	
-			final Hash milestone = Milestone.latestSolidSubmeshMilestone;
-			final int milestoneIndex = Milestone.latestSolidSubmeshMilestoneIndex;
-			long delta = 0L; // for mesh solidity validation
-				
-			synchronized (StorageScratchpad.instance().getAnalyzedTransactionsFlags()) {
-	
-				StorageScratchpad.instance().clearAnalyzedTransactionsFlags();
-	
-				final Queue<Long> nonAnalyzedTransactions = new LinkedList<>(
-						Collections.singleton(StorageTransactions.instance().transactionPointer(milestone.bytes())));
-				Long pointer;
-				
-				
-				while ((pointer = nonAnalyzedTransactions.poll()) != null) {
-	
-					if (StorageScratchpad.instance().setAnalyzedTransactionFlag(pointer) 
-							&& !Snapshot.confirmedSnapshotTransactions.contains(pointer)) // ignore transactions that are already part of the snapshot
-					{
-	
-						final Transaction transaction = StorageTransactions.instance().loadTransaction(pointer);
-	
-						if (transaction.value != 0) {
-							delta += transaction.value;
-							final Hash address = new Hash(transaction.address, 0, Transaction.ADDRESS_SIZE);
-							final Long balance = balances.get(address);
-							if (balance != null) {
-	
-								balances.put(address, balance + transaction.value);
-							}
-						}
-						nonAnalyzedTransactions.offer(transaction.trunkTransactionPointer);
-						nonAnalyzedTransactions.offer(transaction.branchTransactionPointer);
-					}
-				}
-			}
-			
-			if (delta!=0) { // Mesh not solid!
-				return ErrorResponse.create("Mesh not solid (getBalances): "+delta);
-			}
-			
-			final List<String> elements = addresses.stream().map(address -> balances.get(address).toString())
+		final List<Hash> addresses = addrss.stream().map(address -> (new Hash(address)))
 				.collect(Collectors.toCollection(LinkedList::new));
 
-			return GetBalancesResponse.create(elements, milestone, milestoneIndex);
+		final Map<Hash, Long> balances = new HashMap<>();
+		for (final Hash address : addresses) {
+			balances.put(address,
+					Snapshot.initialState.containsKey(address) ? Snapshot.initialState.get(address) : Long.valueOf(0));
 		}
-		finally {
-			Snapshot.updateSnapshotSemaphore.release();
-		} 
+
+		final Hash milestone = Milestone.latestSolidSubmeshMilestone;
+		final int milestoneIndex = Milestone.latestSolidSubmeshMilestoneIndex;
+
+		synchronized (StorageScratchpad.instance().getAnalyzedTransactionsFlags()) {
+
+			StorageScratchpad.instance().clearAnalyzedTransactionsFlags();
+
+			final Queue<Long> nonAnalyzedTransactions = new LinkedList<>(
+					Collections.singleton(StorageTransactions.instance().transactionPointer(milestone.bytes())));
+			Long pointer;
+			while ((pointer = nonAnalyzedTransactions.poll()) != null) {
+
+				if (StorageScratchpad.instance().setAnalyzedTransactionFlag(pointer)) {
+
+					final Transaction transaction = StorageTransactions.instance().loadTransaction(pointer);
+
+					if (transaction.value != 0) {
+
+						final Hash address = new Hash(transaction.address, 0, Transaction.ADDRESS_SIZE);
+						final Long balance = balances.get(address);
+						if (balance != null) {
+
+							balances.put(address, balance + transaction.value);
+						}
+					}
+					nonAnalyzedTransactions.offer(transaction.trunkTransactionPointer);
+					nonAnalyzedTransactions.offer(transaction.branchTransactionPointer);
+				}
+			}
+		}
+
+		final List<String> elements = addresses.stream().map(address -> balances.get(address).toString())
+				.collect(Collectors.toCollection(LinkedList::new));
+
+		return GetBalancesResponse.create(elements, milestone, milestoneIndex);
+	}
+	
+	private AbstractResponse getSnapshotStatement() {
+
+		final Map<Hash, Long> balances = new HashMap<>();
+		
+		for (final Hash address : Snapshot.initialState.keySet()) {
+			balances.put(address,
+					Snapshot.initialState.containsKey(address) ? Snapshot.initialState.get(address) : Long.valueOf(0));
+		}
+		
+		final Hash milestone = Milestone.latestSolidSubmeshMilestone;
+		final int milestoneIndex = Milestone.latestSolidSubmeshMilestoneIndex;
+
+		synchronized (StorageScratchpad.instance().getAnalyzedTransactionsFlags()) {
+
+			StorageScratchpad.instance().clearAnalyzedTransactionsFlags();
+
+			final Queue<Long> nonAnalyzedTransactions = new LinkedList<>(
+					Collections.singleton(StorageTransactions.instance().transactionPointer(milestone.bytes())));
+			Long pointer;
+			while ((pointer = nonAnalyzedTransactions.poll()) != null) {
+
+				if (StorageScratchpad.instance().setAnalyzedTransactionFlag(pointer)) {
+
+					final Transaction transaction = StorageTransactions.instance().loadTransaction(pointer);
+
+					if (transaction.value != 0) {
+						final Hash address = new Hash(transaction.address, 0, Transaction.ADDRESS_SIZE);
+                        final Long balance = balances.getOrDefault(address,0l);
+                        balances.put(address, balance + transaction.value);
+					}
+					nonAnalyzedTransactions.offer(transaction.trunkTransactionPointer);
+					nonAnalyzedTransactions.offer(transaction.branchTransactionPointer);
+				}
+			}
+		}
+		final ArrayList<String> addrs = new ArrayList<String>();
+		final ArrayList<String> bals = new ArrayList<String>();
+		for (Hash h : balances.keySet()) {
+			if (balances.get(h) != 0){
+				addrs.add(h.toString());
+				bals.add(balances.get(h).toString());
+			}
+		}
+		
+		return GetAddressBalancesResponse.create(bals, addrs, milestone, milestoneIndex);
 	}
 
 	private static int counter_PoW = 0;

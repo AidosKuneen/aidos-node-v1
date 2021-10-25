@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.util.TreeMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.slf4j.Logger;
@@ -41,6 +42,9 @@ public class Peers {
 		return false;
 	}
 
+	TreeMap<String, Long> cntErrors = new TreeMap<String, Long>();
+	static Object sem = new Object(); // semaphore
+	
 	public void send(final byte[] packet) {
 		exec.submit(() -> {
 			DataOutputStream dos = null;
@@ -49,7 +53,13 @@ public class Peers {
 				dos = new DataOutputStream(s.getOutputStream());
 				dos.write(packet);
 			} catch (final IOException e) {
-				log.debug("Can't send to {} : {}", address, e.getMessage());
+				synchronized(sem) {
+					Long countErr = cntErrors.getOrDefault(address+e.getMessage(), 0l);
+					if (countErr%100==0) { // omit repeated errors
+						log.debug("Can't send to {} : {}", address, e.getMessage());
+					}
+					cntErrors.put(address+e.getMessage(),countErr+1);
+				}
 			} finally {
 				try {
 					if (dos != null) {
