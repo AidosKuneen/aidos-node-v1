@@ -691,13 +691,9 @@ public class API {
 					final Transaction transaction = StorageTransactions.instance().loadTransaction(pointer);
 
 					if (transaction.value != 0) {
-
 						final Hash address = new Hash(transaction.address, 0, Transaction.ADDRESS_SIZE);
-						final Long balance = balances.get(address);
-						if (balance != null) {
-
-							balances.put(address, balance + transaction.value);
-						}
+                        final Long balance = balances.getOrDefault(address,0l);
+                        balances.put(address, balance + transaction.value);
 					}
 					nonAnalyzedTransactions.offer(transaction.trunkTransactionPointer);
 					nonAnalyzedTransactions.offer(transaction.branchTransactionPointer);
