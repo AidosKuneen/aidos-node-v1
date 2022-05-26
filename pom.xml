@@ -13,7 +13,7 @@
 	<properties>
 		<java-version>1.8</java-version>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <undertown.version>2.2.7.Final</undertown.version>
+        <undertown.version>2.2.11.Final</undertown.version>
 	</properties>
 
 	<repositories>
